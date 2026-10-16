@@ -12,6 +12,7 @@
 
 - [Training evidence](research/evidence-and-training.md)
 - [Background-workout feasibility](research/technical-feasibility.md)
+- [Program generator research](research/program-generator-research.md)
 - [Program generator](design/program-generator-proposal.md)
 - [Running preset plan](design/running-preset-plan.md)
 
