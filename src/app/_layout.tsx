@@ -20,7 +20,7 @@ export default function RootLayout() {
             backgroundColor: colors.background,
           }}
         >
-          <ActivityIndicator accessibilityLabel="Loading your preferences" />
+          <ActivityIndicator accessibilityLabel="Loading" />
         </View>
       }
     >
@@ -34,7 +34,34 @@ export default function RootLayout() {
             contentStyle: { backgroundColor: colors.background },
           }}
         >
-          <Stack.Screen name="index" options={{ title: 'Your training' }} />
+          <Stack.Screen name="index" options={{ title: 'Stages' }} />
+          <Stack.Screen
+            name="welcome"
+            options={{ title: 'Welcome', headerBackVisible: false }}
+          />
+          <Stack.Screen name="session/preview" options={{ title: 'Session' }} />
+          <Stack.Screen
+            name="session/live"
+            options={{
+              title: 'Running',
+              headerBackVisible: false,
+              gestureEnabled: false,
+            }}
+          />
+          <Stack.Screen
+            name="session/check"
+            options={{
+              title: 'Check-in',
+              headerBackVisible: false,
+              gestureEnabled: false,
+            }}
+          />
+          <Stack.Screen
+            name="stage-result"
+            options={{ title: 'Stage result', headerBackVisible: false }}
+          />
+          <Stack.Screen name="history" options={{ title: 'History' }} />
+          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         </Stack>
         <StatusBar style="auto" />
       </SQLiteProvider>

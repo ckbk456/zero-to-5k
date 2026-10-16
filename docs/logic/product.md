@@ -13,9 +13,9 @@ The pace column explains why the targets are beginner-friendly. It is not a requ
 
 The eventual health-oriented target is vigorous aerobic activity. Beginners can start easier; duration and intensity are distinct. Do not count all recovery/warm-up minutes as vigorous, force maximal effort, or position this as diabetes/cardiac rehabilitation.
 
-## Current scaffold
+## Current app
 
-The home screen explains the goal and persists the selected activity. It explicitly states workouts are unavailable. There is no fake Start action, fabricated completion, invented training curriculum, or background reliability claim.
+The MVP experience below is implemented: welcome and safety screen, stage map, session preview, live session driven by the native runtime, post-session check-in with advisory restart, stage results, history, and settings. Device validation of screen-off cues is pending (see the [workout runtime guide](../../testing/MANUAL%20TO-DO/workout-runtime.md)). The activity picker was removed from the UI; the stored preference remains running.
 
 ## MVP experience
 
