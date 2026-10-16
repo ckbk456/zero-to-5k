@@ -6,11 +6,13 @@ Updated 2026-10-16. Core first: the MVP is running only, works without an accoun
 
 Native home screen, SQLite activity preference and migration, host SQL tests, repository workflow, CI definitions, public research. Results live in [bootstrap](bootstrap.md). Device QA, final identity/icon, and license selection remain pending.
 
-## Gate — MVP spec review
+## Gate — MVP spec review (done)
 
-The product owner reviews and approves the [MVP spec and scope](design/mvp-spec.md), including its open questions. No MVP building starts before approval.
+Approved for implementation by the product owner on 2026-10-16.
 
-## M1 — Locked-screen timer spike
+## M1 — Locked-screen timer (built; device gate open)
+
+Implemented in `modules/session-runtime` (#3, chimes #6). Android emulator evidence is in the [workout runtime guide](../testing/MANUAL%20TO-DO/workout-runtime.md); the physical-device exit gate below is still open.
 
 Highest risk; everything else depends on it.
 
@@ -19,14 +21,14 @@ Highest risk; everything else depends on it.
 - iOS: background audio session held for the whole workout, ducking other audio per cue. Measure reliability and App Review risk; do not rely on an inaudible loop.
 - Exit gate: a 40-minute session on a physical iPhone and Android phone, screen off, with music and with a podcast, meets the [workout runtime](../testing/MANUAL%20TO-DO/workout-runtime.md) checks agreed for MVP.
 
-## M2 — Plan and stage progression
+## M2 — Plan and stage progression (done, #2)
 
 - Versioned plan format: stages → sessions → intervals (seconds), with interval kind `active` or `walk` so race walking can reuse it. Plan definitions are separate from history.
 - Bundle the [running preset plan](design/running-preset-plan.md) as 9 stages.
 - Append a migration for session-attempt history with effort ratings; derive the current stage per [MVP spec](design/mvp-spec.md).
 - Unit tests cover clearing (all sessions rated 8 or lower, no pain), retry recommendations (any 9–10 or pain), continuing anyway, early stops, and that history is never rewritten.
 
-## M3 — App screens
+## M3 — App screens (done, #4, #5)
 
 Stage map, session preview, live session (driven by M1), effort rating after each session, stage cleared/retry screens, and history.
 
