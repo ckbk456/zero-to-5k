@@ -12,3 +12,15 @@ MVP gate (spec §7). Record device, OS, build, date, tester, and result for each
 8. Battery drain over a 40-minute session.
 
 Agree measurable supported conditions before claiming reliability. Curriculum review is a separate gate.
+
+## Evidence log
+
+Emulator runs are development evidence, not physical-device QA; they cannot show real audio output, ducking of other apps, or battery behavior.
+
+| Date       | Build                               | Target                           | Check                                                                    | Result                                                                                                                                                                     |
+| ---------- | ----------------------------------- | -------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-16 | `758e23f` release APK (spoken cues) | Pixel 9 emulator, Android API 36 | Item 1 timing: stage 1 session (28:30) with the screen asleep throughout | All 18 cues requested audio focus within 0.4 s of their planned times (from `dumpsys audio`); foreground service and wake lock released at the end; check-in shown on wake |
+| 2026-10-16 | same                                | same                             | Item 4: emulated incoming call                                           | Session auto-paused ("Paused for a call")                                                                                                                                  |
+| 2026-10-16 | same                                | same                             | Item 3: End from the app                                                 | Recorded "Ended early · 6:19"; service stopped                                                                                                                             |
+| 2026-10-17 | `1c18307` release APK (chime cues)  | same                             | Cue playback                                                             | Chime (MediaPlayer, ~0.86 s) then word; audio focus held 1.5 s and released                                                                                                |
+| 2026-10-17 | `1c18307`                           | iPhone 17 simulator, iOS 27.1    | Build                                                                    | Debug build succeeded; chime resource bundle present. Not run on a device: signing blocked until the Apple Developer Program License Agreement is accepted                 |
