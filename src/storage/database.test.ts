@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 
 import type { Activity } from '../domain/activity';
@@ -16,46 +15,15 @@ import {
   listAttempts,
   recordCheck,
   recordDecision,
+  getSettings,
   resetProgress,
   startAttempt,
+  updateSettings,
   migrateDatabase,
   setPreferredActivity,
   type Database,
-  type SqlParam,
 } from './database';
-
-function connect(path = ':memory:') {
-  const sqlite = new DatabaseSync(path);
-  const db: Database = {
-    async execAsync(sql) {
-      sqlite.exec(sql);
-    },
-    async getFirstAsync<T>(sql: string, ...params: SqlParam[]) {
-      return (sqlite.prepare(sql).get(...params) as T | undefined) ?? null;
-    },
-    async getAllAsync<T>(sql: string, ...params: SqlParam[]) {
-      return sqlite.prepare(sql).all(...params) as T[];
-    },
-    async runAsync(sql, ...params) {
-      const result = sqlite.prepare(sql).run(...params);
-      return {
-        lastInsertRowId: Number(result.lastInsertRowid),
-        changes: Number(result.changes),
-      };
-    },
-    async withExclusiveTransactionAsync(task) {
-      sqlite.exec('BEGIN EXCLUSIVE');
-      try {
-        await task(db);
-        sqlite.exec('COMMIT');
-      } catch (error) {
-        sqlite.exec('ROLLBACK');
-        throw error;
-      }
-    },
-  };
-  return { db, sqlite };
-}
+import { connect } from './test-sqlite';
 
 test('fresh migration installs defaults; reopening preserves the selection', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'zero-to-5k-sqlite-'));
@@ -186,8 +154,13 @@ test('version 1 databases upgrade to session history without losing data', async
     assert.equal(
       (await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))
         ?.user_version,
-      2,
+      DATABASE_VERSION,
     );
+    assert.deepEqual(await getSettings(db), {
+      onboarded: false,
+      speech: true,
+      vibration: true,
+    });
   } finally {
     sqlite.close();
   }
@@ -242,10 +215,12 @@ test('stale sessions become interrupted, never completed', async () => {
   try {
     await migrateDatabase(db);
     const id = await startAttempt(db, attempt);
-    await interruptStaleAttempts(db);
-    const [row] = await listAttempts(db, 'running-v1');
+    const live = await startAttempt(db, attempt);
+    await interruptStaleAttempts(db, live);
+    const [row, liveRow] = await listAttempts(db, 'running-v1');
     assert.equal(row?.id, id);
     assert.equal(row?.status, 'interrupted');
+    assert.equal(liveRow?.status, 'in_progress');
     assert.equal(row?.effort, null);
     assert.throws(() =>
       sqlite.exec(`UPDATE session_attempts SET effort = 3, pain = 0`),
@@ -267,6 +242,23 @@ test('schema rejects invalid attempts; reset clears history', async () => {
     await resetProgress(db);
     assert.deepEqual(await listAttempts(db, 'running-v1'), []);
     assert.deepEqual(await listAttempts(db, 'other'), []);
+  } finally {
+    sqlite.close();
+  }
+});
+
+test('settings default on and persist partial updates', async () => {
+  const { db, sqlite } = connect();
+  try {
+    await migrateDatabase(db);
+    await updateSettings(db, { onboarded: true, speech: false });
+    assert.deepEqual(await getSettings(db), {
+      onboarded: true,
+      speech: false,
+      vibration: true,
+    });
+    await updateSettings(db, {});
+    assert.throws(() => sqlite.exec('UPDATE app_preferences SET speech = 2'));
   } finally {
     sqlite.close();
   }

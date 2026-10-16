@@ -3,8 +3,10 @@ node_modules/
 .expo/
 dist/
 coverage/
-ios/
-android/
+/ios/
+/android/
+modules/*/android/build/
+modules/*/android/.cxx/
 *.tsbuildinfo
 expo-env.d.ts
 

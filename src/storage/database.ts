@@ -25,7 +25,7 @@ export interface Database extends SqlConnection {
   ): Promise<void>;
 }
 
-export const DATABASE_VERSION = 2;
+export const DATABASE_VERSION = 3;
 
 export async function migrateDatabase(db: Database): Promise<void> {
   const version = await db.getFirstAsync<{ user_version: number }>(
@@ -39,7 +39,7 @@ export async function migrateDatabase(db: Database): Promise<void> {
   if (version.user_version === DATABASE_VERSION) return;
 
   // Append new migrations; never edit a released one.
-  const migrations = [migration1, migration2];
+  const migrations = [migration1, migration2, migration3];
   for (const [index, migrate] of migrations.entries()) {
     if (version.user_version > index) continue;
     await db.withExclusiveTransactionAsync(async (transaction) => {
@@ -105,6 +105,52 @@ export async function setPreferredActivity(
     `INSERT INTO app_preferences (id, activity) VALUES (1, ?)
      ON CONFLICT(id) DO UPDATE SET activity = excluded.activity`,
     activity,
+  );
+}
+
+async function migration3(db: SqlConnection): Promise<void> {
+  await db.execAsync(`
+    ALTER TABLE app_preferences ADD COLUMN onboarded INTEGER NOT NULL
+      DEFAULT 0 CHECK (onboarded IN (0, 1));
+    ALTER TABLE app_preferences ADD COLUMN speech INTEGER NOT NULL
+      DEFAULT 1 CHECK (speech IN (0, 1));
+    ALTER TABLE app_preferences ADD COLUMN vibration INTEGER NOT NULL
+      DEFAULT 1 CHECK (vibration IN (0, 1));
+  `);
+}
+
+export interface Settings {
+  onboarded: boolean;
+  speech: boolean;
+  vibration: boolean;
+}
+
+export async function getSettings(db: SqlConnection): Promise<Settings> {
+  const row = await db.getFirstAsync<{
+    onboarded: number;
+    speech: number;
+    vibration: number;
+  }>('SELECT onboarded, speech, vibration FROM app_preferences WHERE id = 1');
+  if (!row) throw new Error('Your settings could not be read.');
+  return {
+    onboarded: row.onboarded === 1,
+    speech: row.speech === 1,
+    vibration: row.vibration === 1,
+  };
+}
+
+export async function updateSettings(
+  db: SqlConnection,
+  changes: Partial<Settings>,
+): Promise<void> {
+  const columns = (['onboarded', 'speech', 'vibration'] as const).filter(
+    (key) => typeof changes[key] === 'boolean',
+  );
+  if (columns.length === 0) return;
+  await db.runAsync(
+    `UPDATE app_preferences SET ${columns.map((key) => `${key} = ?`).join(', ')}
+     WHERE id = 1`,
+    ...columns.map((key) => (changes[key] ? 1 : 0)),
   );
 }
 
@@ -203,10 +249,14 @@ export async function finishAttempt(
 
 // Marks sessions left running by a previous app process. Unseen time is
 // never credited.
-export async function interruptStaleAttempts(db: SqlConnection): Promise<void> {
+export async function interruptStaleAttempts(
+  db: SqlConnection,
+  exceptId: number | null = null,
+): Promise<void> {
   await db.runAsync(
     `UPDATE session_attempts SET status = 'interrupted'
-     WHERE status = 'in_progress'`,
+     WHERE status = 'in_progress' AND id IS NOT ?`,
+    exceptId,
   );
 }
 

@@ -64,11 +64,11 @@ Recorded in the [roadmap](../roadmap.md#after-mvp): race walking; custom program
 Owned by a native module (Swift/Kotlin); the JavaScript UI only displays its state. Validated in roadmap M1.
 
 - **Timing:** elapsed time from a monotonic clock minus paused time; never by counting UI ticks.
-- **Cues:** at every interval change, a spoken cue ("Run for 3 minutes", "Walk for 90 seconds", "Warm-up: walk for 5 minutes", "Cool-down", "Session complete") plus a vibration. Also "Halfway" and "One minute left" during intervals of 5 minutes or longer. _Default:_ system text-to-speech, so no recorded audio is needed.
+- **Cues:** at every interval change, a spoken cue ("Run for 3 minutes", "Walk for 90 seconds", "Warm-up: walk for 5 minutes", "Cool-down", "Session complete") plus a vibration. Also "Halfway" and "One minute left" during runs of 5 minutes or longer. _Default:_ system text-to-speech, so no recorded audio is needed.
 - **Other audio:** other apps' audio is lowered briefly for each cue, then restored. The app never plays continuous sound of its own.
 - **Controls:** Pause/Resume and End (with confirmation). Android: an ongoing notification shows the current interval and remaining time, with Pause/Resume and End. iOS: in-app controls only (_default_; lock-screen controls deferred).
 - **Interruptions** (_defaults_):
-  - Phone call or another app taking audio permanently: auto-pause; a cue says "Paused"; the user resumes manually.
+  - Phone call: auto-pause silently; the user resumes manually ("Resuming" is spoken). Other apps' audio does not pause the session.
   - Headphones disconnected: keep running; cues continue on the current output.
   - App killed or phone restarted mid-session: on next launch, show "Your last session was interrupted", record it as ended early, and offer to start it again. Unseen time is never credited.
 - **Live screen:** current interval (Run/Walk) and its countdown, total remaining, a bar of all intervals, Pause/End. The screen may sleep at any time without affecting the session.
@@ -77,7 +77,7 @@ Owned by a native module (Swift/Kotlin); the JavaScript UI only displays its sta
 
 1. **First launch:** what the app does; who it is for (generally healthy adults); a safety note (stop for chest pain, dizziness, or severe breathlessness; check with a doctor if unsure); Start.
 2. **Stage map (home):** the 9 stages with state, the current stage's 3 sessions, and a button to start the next one.
-3. **Session preview:** interval bar and list, total duration, short stage tip, Start. Asks for notification permission on Android the first time.
+3. **Session preview:** interval bar and list, total duration, short stage tip, Start. Asks for notification permission on Android, and for Apple Health workout permission on iOS, the first time.
 4. **Live session:** see §4.
 5. **Post-session check:** effort, pain, recommendation (§3).
 6. **Stage result:** cleared or completed, next stage unlocked; goal-reached screen after stage 9.
@@ -98,7 +98,7 @@ The existing activity picker is removed from the UI; the stored preference stays
 - Pause, resume, and end work from the app (both platforms) and from the notification (Android).
 - Progression logic has unit tests for clearing, both recommendation triggers, Keep going, Restart stage, ended-early sessions, interrupted sessions, and stage 9 replays.
 - The plan data equals the [running preset plan](running-preset-plan.md) (tested).
-- The app works in airplane mode and never asks for location, health, or account permissions.
+- The app works in airplane mode and never asks for location or account permissions. On iOS it asks only for permission to save workouts to Apple Health, because an Apple Health workout session (iOS 26+) is the supported way to keep running with the screen locked; it reads and writes no health data. If declined, or below iOS 26, the screen stays on during sessions and the app says so.
 - `npm run check` and `npm run export:mobile` pass; native development builds install on both test phones.
 
 ## 8. Open questions for review
@@ -106,5 +106,5 @@ The existing activity picker is removed from the UI; the stored preference stays
 1. Is restarting a stage from session 1 correct, or should a restart repeat only the hard session?
 2. Spoken cue wording and voice: system text-to-speech acceptable for the MVP?
 3. Interruption defaults in §4: acceptable?
-4. Minimum OS versions (proposal: iOS 17+, Android 10+), pending the M1 test.
+4. Minimum OS versions: the app installs on iOS 16.4+ and Android 7+ (Expo SDK 57 defaults); screen-off sessions need iOS 26+.
 5. App name: keep "Build to 30"?
