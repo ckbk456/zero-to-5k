@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "Build to 30",
+    "slug": "zero-to-5k",
+    "version": "0.1.0",
+    "scheme": "zeroto5k",
+    "platforms": ["ios", "android"],
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router", "expo-sqlite"],
+    "experiments": { "typedRoutes": true }
+  }
+}

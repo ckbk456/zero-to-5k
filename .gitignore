@@ -1,0 +1,33 @@
+# Dependencies and generated native/build output
+node_modules/
+.expo/
+dist/
+coverage/
+ios/
+android/
+*.tsbuildinfo
+expo-env.d.ts
+
+# Local research originals, credentials, environment, and recordings
+.local/
+.env
+.env.*
+!.env.example
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.pem
+*.key
+*.p12
+*.mobileprovision
+*.jks
+*.keystore
+recordings/
+artifacts/
+npm-debug.*
+.DS_Store
+.idea/
+.vscode/
