@@ -1,0 +1,219 @@
+import { useEffect, useRef, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
+import { Alert, AppState, BackHandler, Text, View } from 'react-native';
+
+import { INTERVAL_LABELS } from '@/domain/cues';
+import { RUNNING_PLAN, getSession, type Interval } from '@/domain/plan';
+import { SessionRuntime, type RuntimeState } from '@modules/session-runtime';
+import { settle } from '@/session/controller';
+import { listAttempts } from '@/storage/database';
+import { colors } from '@/theme/colors';
+import {
+  Body,
+  Button,
+  Card,
+  ErrorText,
+  IntervalBar,
+  Loading,
+  Screen,
+  formatClock,
+} from '@/ui/kit';
+
+function locate(intervals: readonly Interval[], elapsedSeconds: number) {
+  let end = 0;
+  for (const [index, interval] of intervals.entries()) {
+    end += interval.seconds;
+    if (elapsedSeconds < end) {
+      return { index, interval, remaining: end - elapsedSeconds };
+    }
+  }
+  const last = intervals.length - 1;
+  return { index: last, interval: intervals[last]!, remaining: 0 };
+}
+
+export function LiveScreen() {
+  const { attempt } = useLocalSearchParams<{ attempt: string }>();
+  const attemptId = Number(attempt);
+  const db = useSQLiteContext();
+  const [state, setState] = useState<RuntimeState | null>(null);
+  const [target, setTarget] = useState<{
+    stage: number;
+    sessionIndex: number;
+    isReplay: boolean;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const leaving = useRef(false);
+
+  useEffect(() => {
+    void listAttempts(db, RUNNING_PLAN.version).then((rows) => {
+      const row = rows.find((item) => item.id === attemptId);
+      if (row) setTarget(row);
+      else setError('This session could not be found.');
+    });
+  }, [db, attemptId]);
+
+  // The runtime is the source of truth; poll it while visible and listen for
+  // status changes.
+  useEffect(() => {
+    let active = true;
+    const refresh = () =>
+      void SessionRuntime.getState().then((next) => active && setState(next));
+    refresh();
+    const timer = setInterval(refresh, 500);
+    const subscription = SessionRuntime.addListener('onStateChange', (next) => {
+      if (active) setState(next);
+    });
+    const appState = AppState.addEventListener('change', (status) => {
+      if (status === 'active') refresh();
+    });
+    const back = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => {
+      active = false;
+      clearInterval(timer);
+      subscription.remove();
+      appState.remove();
+      back.remove();
+    };
+  }, []);
+
+  // Record the result once the runtime finishes or the user ends early.
+  useEffect(() => {
+    if (!state || !target || leaving.current) return;
+    const done = state.status === 'finished' || state.status === 'ended';
+    const lost = state.status === 'idle';
+    if (!done && !lost) return;
+    leaving.current = true;
+    void settle(db, SessionRuntime)
+      .then((result) => {
+        if (result.kind === 'completed' && !target.isReplay) {
+          router.replace({
+            pathname: '/session/check',
+            params: { attempt: String(attemptId) },
+          });
+        } else {
+          router.dismissAll();
+        }
+      })
+      .catch(() => {
+        leaving.current = false;
+        setError('Your session could not be saved. Please try again.');
+      });
+  }, [state, target, db, attemptId]);
+
+  if (error) {
+    return (
+      <Screen>
+        <ErrorText>{error}</ErrorText>
+        <Button label="Back to stages" onPress={() => router.dismissAll()} />
+      </Screen>
+    );
+  }
+  if (!state || !target) return <Loading label="Loading session" />;
+
+  const session = getSession(RUNNING_PLAN, target.stage, target.sessionIndex);
+  const elapsed = state.elapsedMs / 1000;
+  const total = state.totalMs / 1000;
+  const { index, interval, remaining } = locate(session.intervals, elapsed);
+  const next = session.intervals[index + 1];
+  const paused = state.status === 'paused';
+
+  function confirmEnd() {
+    Alert.alert(
+      'End this session?',
+      'It will not count as completed. You can start it again any time.',
+      [
+        { text: 'Keep going', style: 'cancel' },
+        {
+          text: 'End session',
+          style: 'destructive',
+          onPress: () => void SessionRuntime.end(),
+        },
+      ],
+    );
+  }
+
+  return (
+    <Screen>
+      <Text style={{ color: colors.secondary, fontSize: 16 }}>
+        Stage {target.stage} · Session {target.sessionIndex + 1}
+        {target.isReplay ? ' · Replay' : ''}
+      </Text>
+
+      <View
+        accessible
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={`${INTERVAL_LABELS[interval.kind]}, ${formatClock(remaining)} left`}
+        style={{ alignItems: 'center', paddingVertical: 24, gap: 4 }}
+      >
+        <Text
+          style={{
+            color: interval.kind === 'active' ? colors.accent : colors.text,
+            fontSize: 40,
+            fontWeight: '800',
+          }}
+        >
+          {INTERVAL_LABELS[interval.kind]}
+        </Text>
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: 80,
+            fontWeight: '200',
+            fontVariant: ['tabular-nums'],
+          }}
+        >
+          {formatClock(remaining)}
+        </Text>
+        {paused && (
+          <Text
+            style={{ color: colors.warning, fontSize: 20, fontWeight: '600' }}
+          >
+            {state.pausedBy === 'call' ? 'Paused for a call' : 'Paused'}
+          </Text>
+        )}
+      </View>
+
+      <Card>
+        <IntervalBar
+          intervals={session.intervals}
+          progress={total > 0 ? elapsed / total : 0}
+        />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Body muted>{formatClock(elapsed)} done</Body>
+          <Body muted>{formatClock(total - elapsed)} left</Body>
+        </View>
+        {next && (
+          <Body muted>
+            Next: {INTERVAL_LABELS[next.kind]} for {formatClock(next.seconds)}
+          </Body>
+        )}
+      </Card>
+
+      {!state.backgroundCapable && (
+        <Card>
+          <Text
+            style={{ color: colors.warning, fontSize: 16, fontWeight: '600' }}
+          >
+            Keep the screen on
+          </Text>
+          <Body>
+            Cues stop if the phone locks. To run with the screen off, allow
+            Build to 30 to save workouts in the Health app (Sharing → Apps), on
+            iOS 26 or later.
+          </Body>
+        </Card>
+      )}
+
+      <Button
+        label={paused ? 'Resume' : 'Pause'}
+        onPress={() =>
+          void (paused ? SessionRuntime.resume() : SessionRuntime.pause()).then(
+            setState,
+          )
+        }
+      />
+      <Button label="End session" kind="danger" onPress={confirmEnd} />
+    </Screen>
+  );
+}

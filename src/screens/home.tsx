@@ -1,219 +1,226 @@
 import { useEffect, useState } from 'react';
-import { useSQLiteContext } from 'expo-sqlite';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  useColorScheme,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Redirect, router } from 'expo-router';
+import { Text, View } from 'react-native';
 
-import { ACTIVITIES, type Activity } from '@/domain/activity';
-import { getPreferredActivity, setPreferredActivity } from '@/storage/database';
+import { RUNNING_PLAN, SESSIONS_PER_STAGE, totalSeconds } from '@/domain/plan';
+import type { StageState } from '@/domain/progression';
+import { SessionRuntime } from '@modules/session-runtime';
+import { settle } from '@/session/controller';
+import { useProgram } from '@/session/use-program';
 import { colors } from '@/theme/colors';
+import {
+  Body,
+  Button,
+  Card,
+  ErrorText,
+  Heading,
+  IntervalBar,
+  Loading,
+  Row,
+  Screen,
+  Title,
+} from '@/ui/kit';
 
-const labels: Record<Activity, string> = {
-  running: 'Running',
-  'race-walking': 'Race walking',
+const STATE_LABELS: Record<StageState, string> = {
+  locked: 'Locked',
+  current: 'Current',
+  completed: 'Completed',
+  cleared: 'Cleared',
+};
+
+const STATE_ICONS: Record<StageState, string> = {
+  locked: '○',
+  current: '▶',
+  completed: '✓',
+  cleared: '★',
 };
 
 export function HomeScreen() {
-  useColorScheme();
-  const insets = useSafeAreaInsets();
-  const db = useSQLiteContext();
-  const [activity, setActivity] = useState<Activity | null>(null);
-  const [busy, setBusy] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { db, data, error, reload } = useProgram();
+  const [settled, setSettled] = useState(false);
 
-  async function load() {
-    setBusy(true);
-    setError(null);
-    try {
-      setActivity(await getPreferredActivity(db));
-    } catch {
-      setError('Your preference could not be loaded. Please try again.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
+  // Reattach to a live session or record one that ended while away.
   useEffect(() => {
     let active = true;
-    void getPreferredActivity(db).then(
-      (value) => {
+    void settle(db, SessionRuntime)
+      .then((result) => {
         if (!active) return;
-        setActivity(value);
-        setBusy(false);
-      },
-      () => {
-        if (!active) return;
-        setError('Your preference could not be loaded. Please try again.');
-        setBusy(false);
-      },
-    );
+        if (result.kind === 'live') {
+          router.push({
+            pathname: '/session/live',
+            params: { attempt: String(result.attemptId) },
+          });
+        }
+        // A session that finished while away surfaces as a pending check-in.
+        return reload();
+      })
+      .catch(() => {})
+      .finally(() => active && setSettled(true));
     return () => {
       active = false;
     };
-  }, [db]);
+  }, [db, reload]);
 
-  async function selectActivity(next: Activity) {
-    setBusy(true);
-    setError(null);
-    try {
-      await setPreferredActivity(db, next);
-      setActivity(next);
-    } catch {
-      setError('Your change could not be saved. Please try again.');
-    } finally {
-      setBusy(false);
-    }
+  if (error) {
+    return (
+      <Screen>
+        <ErrorText>{error}</ErrorText>
+        <Button label="Try again" onPress={() => void reload()} />
+      </Screen>
+    );
   }
+  if (!data || !settled) return <Loading label="Loading your progress" />;
+  if (!data.settings.onboarded) return <Redirect href="/welcome" />;
+
+  const { progress } = data;
+  const next = progress.next;
 
   return (
-    <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
-      style={{ backgroundColor: colors.background }}
-      contentContainerStyle={{
-        padding: 24,
-        paddingBottom: Math.max(insets.bottom, 24),
-        gap: 28,
-      }}
-    >
-      <View style={{ gap: 12 }}>
-        <Text
-          selectable
-          style={{
-            color: colors.secondary,
-            fontSize: 14,
-            fontWeight: '600',
-            letterSpacing: 1.5,
-          }}
-        >
-          BUILD TO 30
-        </Text>
-        <Text
-          accessibilityRole="header"
-          style={{
-            color: colors.text,
-            fontSize: 34,
-            fontWeight: '700',
-            lineHeight: 40,
-          }}
-        >
-          Time well spent.
-        </Text>
-        <Text
-          selectable
-          style={{ color: colors.secondary, fontSize: 18, lineHeight: 27 }}
-        >
-          Build toward 30 minutes of running or race walking, at your pace.
-          Every completed session counts.
-        </Text>
-      </View>
-      <View
-        style={{
-          backgroundColor: colors.card,
-          padding: 24,
-          borderRadius: 24,
-          borderCurve: 'continuous',
-          gap: 18,
-        }}
-      >
-        <Text
-          accessibilityRole="header"
-          style={{ color: colors.text, fontSize: 20, fontWeight: '600' }}
-        >
-          Choose your activity
-        </Text>
-        <View accessibilityRole="radiogroup" style={{ gap: 12 }}>
-          {ACTIVITIES.map((option) => (
-            <Pressable
-              key={option}
-              accessibilityRole="radio"
-              accessibilityState={{
-                checked: activity === option,
-                disabled: busy || activity === null,
+    <Screen>
+      <Title>Build to 30</Title>
+      <Body muted>
+        Clear 9 stages to run for 30 minutes without stopping. Finishing the
+        planned time is what counts — not distance or speed.
+      </Body>
+
+      {progress.pending && (
+        <Card>
+          <Heading>Finish your check-in</Heading>
+          <Body>Tell us how your last session felt before the next one.</Body>
+          <Button
+            label="Check in"
+            onPress={() =>
+              router.push({
+                pathname: '/session/check',
+                params: { attempt: String(progress.pending!.attemptId) },
+              })
+            }
+          />
+        </Card>
+      )}
+
+      {progress.goalReached && (
+        <Card>
+          <Heading>Goal reached 🎉</Heading>
+          <Body>
+            You can run for 30 minutes. Replay any stage 9 session to keep it
+            up; replays are saved in your history.
+          </Body>
+          {[0, 1, 2].map((index) => (
+            <Button
+              key={index}
+              kind="secondary"
+              label={`Replay stage 9, session ${index + 1}`}
+              onPress={() =>
+                router.push({
+                  pathname: '/session/preview',
+                  params: { stage: '9', index: String(index), replay: '1' },
+                })
+              }
+            />
+          ))}
+        </Card>
+      )}
+
+      {next && (
+        <Card>
+          <Text style={{ color: colors.accent, fontWeight: '600' }}>
+            STAGE {next.stage}
+            {next.stageAttempt > 1 ? ` · ATTEMPT ${next.stageAttempt}` : ''}
+          </Text>
+          <Heading>
+            Session {next.sessionIndex + 1} of {SESSIONS_PER_STAGE}
+          </Heading>
+          <Body muted>{RUNNING_PLAN.stages[next.stage - 1]?.tip}</Body>
+          <SessionDots done={next.sessionIndex} />
+          <IntervalBar
+            intervals={
+              RUNNING_PLAN.stages[next.stage - 1]!.sessions[next.sessionIndex]!
+                .intervals
+            }
+          />
+          <Button
+            label="Preview session"
+            onPress={() =>
+              router.push({
+                pathname: '/session/preview',
+                params: {
+                  stage: String(next.stage),
+                  index: String(next.sessionIndex),
+                },
+              })
+            }
+          />
+        </Card>
+      )}
+
+      <Card>
+        <Heading>Stages</Heading>
+        {RUNNING_PLAN.stages.map((stage, index) => {
+          const state = progress.stages[index] ?? 'locked';
+          const minutes = Math.round(
+            Math.max(...stage.sessions.map(totalSeconds)) / 60,
+          );
+          return (
+            <View
+              key={stage.number}
+              accessible
+              accessibilityLabel={`Stage ${stage.number}, ${STATE_LABELS[state]}`}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                minHeight: 40,
+                opacity: state === 'locked' ? 0.5 : 1,
               }}
-              disabled={busy || activity === null}
-              onPress={() => void selectActivity(option)}
-              style={({ pressed }) => ({
-                minHeight: 56,
-                justifyContent: 'center',
-                borderRadius: 14,
-                borderCurve: 'continuous',
-                borderWidth: activity === option ? 2 : 1,
-                borderColor:
-                  activity === option ? colors.accent : colors.secondary,
-                paddingHorizontal: 18,
-                opacity: pressed || busy ? 0.6 : 1,
-              })}
             >
               <Text
                 style={{
-                  color: colors.text,
+                  width: 24,
+                  textAlign: 'center',
                   fontSize: 18,
-                  fontWeight: activity === option ? '600' : '400',
+                  color: state === 'locked' ? colors.secondary : colors.accent,
                 }}
               >
-                {labels[option]}
+                {STATE_ICONS[state]}
               </Text>
-            </Pressable>
-          ))}
-        </View>
-        {busy && (
-          <ActivityIndicator accessibilityLabel="Saving or loading your activity" />
-        )}
-        {error && (
-          <Text
-            selectable
-            accessibilityRole="alert"
-            style={{ color: colors.text }}
-          >
-            {error}
-          </Text>
-        )}
-        {!busy && activity === null && (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void load()}
-            style={{ minHeight: 48, justifyContent: 'center' }}
-          >
-            <Text style={{ color: colors.text, fontWeight: '600' }}>
-              Try again
-            </Text>
-          </Pressable>
-        )}
-        <Text
-          selectable
-          style={{ color: colors.secondary, fontSize: 14, lineHeight: 21 }}
-        >
-          Your choice is saved on this device.
-        </Text>
-      </View>
-      <View style={{ gap: 12 }}>
-        <Text
-          accessibilityRole="header"
-          style={{ color: colors.text, fontSize: 20, fontWeight: '600' }}
-        >
-          A goal measured in minutes
-        </Text>
-        <Text
-          selectable
-          style={{ color: colors.secondary, fontSize: 17, lineHeight: 26 }}
-        >
-          Work toward three sessions a week. Progress is about time and
-          consistency, with room to repeat a step.
-        </Text>
-        <Text
-          selectable
-          style={{ color: colors.secondary, fontSize: 15, lineHeight: 23 }}
-        >
-          Training sessions are coming next. This preview saves your activity
-          choice; it does not yet guide a workout.
-        </Text>
-      </View>
-    </ScrollView>
+              <Text style={{ flex: 1, color: colors.text, fontSize: 17 }}>
+                Stage {stage.number}
+              </Text>
+              <Text style={{ color: colors.secondary, fontSize: 15 }}>
+                {STATE_LABELS[state]} · up to {minutes} min
+              </Text>
+            </View>
+          );
+        })}
+        <Body muted>
+          ★ cleared: every session at effort 8 or lower with no pain. ✓
+          completed: you kept going after a recommendation to restart.
+        </Body>
+      </Card>
+
+      <Card>
+        <Row label="History" onPress={() => router.push('/history')} />
+        <Row label="Settings" onPress={() => router.push('/settings')} />
+      </Card>
+    </Screen>
+  );
+}
+
+function SessionDots({ done }: { done: number }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      {Array.from({ length: SESSIONS_PER_STAGE }, (_, index) => (
+        <View
+          key={index}
+          style={{
+            flex: 1,
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: index < done ? colors.accent : colors.track,
+          }}
+        />
+      ))}
+    </View>
   );
 }

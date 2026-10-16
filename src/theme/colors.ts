@@ -27,4 +27,23 @@ export const colors = {
     android: Color.android.dynamic.primary,
     default: '#21663c',
   })!,
+  onAccent: Platform.select({
+    android: Color.android.dynamic.onPrimary,
+    default: '#ffffff',
+  })!,
+  danger: Platform.select({
+    ios: Color.ios.systemRed,
+    android: Color.android.dynamic.error,
+    default: '#b3261e',
+  })!,
+  warning: Platform.select({
+    ios: Color.ios.systemOrange,
+    android: Color.android.dynamic.tertiary,
+    default: '#a15c00',
+  })!,
+  track: Platform.select({
+    ios: Color.ios.systemFill,
+    android: Color.android.dynamic.surfaceVariant,
+    default: '#dde3dc',
+  })!,
 };
