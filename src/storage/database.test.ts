@@ -10,10 +10,18 @@ import { test } from 'node:test';
 import type { Activity } from '../domain/activity';
 import {
   DATABASE_VERSION,
+  finishAttempt,
   getPreferredActivity,
+  interruptStaleAttempts,
+  listAttempts,
+  recordCheck,
+  recordDecision,
+  resetProgress,
+  startAttempt,
   migrateDatabase,
   setPreferredActivity,
   type Database,
+  type SqlParam,
 } from './database';
 
 function connect(path = ':memory:') {
@@ -22,11 +30,18 @@ function connect(path = ':memory:') {
     async execAsync(sql) {
       sqlite.exec(sql);
     },
-    async getFirstAsync<T>(sql: string, ...params: (string | number)[]) {
+    async getFirstAsync<T>(sql: string, ...params: SqlParam[]) {
       return (sqlite.prepare(sql).get(...params) as T | undefined) ?? null;
     },
+    async getAllAsync<T>(sql: string, ...params: SqlParam[]) {
+      return sqlite.prepare(sql).all(...params) as T[];
+    },
     async runAsync(sql, ...params) {
-      return sqlite.prepare(sql).run(...params);
+      const result = sqlite.prepare(sql).run(...params);
+      return {
+        lastInsertRowId: Number(result.lastInsertRowid),
+        changes: Number(result.changes),
+      };
     },
     async withExclusiveTransactionAsync(task) {
       sqlite.exec('BEGIN EXCLUSIVE');
@@ -140,6 +155,118 @@ test('invalid activity and singleton rows cannot overwrite valid data', async ()
     assert.equal(await getPreferredActivity(db), 'running');
     sqlite.exec('DELETE FROM app_preferences');
     await assert.rejects(getPreferredActivity(db), /could not be read/);
+  } finally {
+    sqlite.close();
+  }
+});
+
+const attempt = {
+  planVersion: 'running-v1',
+  stage: 1,
+  sessionIndex: 0,
+  stageAttempt: 1,
+  isReplay: false,
+  startedAt: '2026-10-16T08:00:00.000Z',
+};
+
+test('version 1 databases upgrade to session history without losing data', async () => {
+  const { db, sqlite } = connect();
+  try {
+    sqlite.exec(`
+      CREATE TABLE app_preferences (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        activity TEXT NOT NULL CHECK (activity IN ('running', 'race-walking'))
+      );
+      INSERT INTO app_preferences (id, activity) VALUES (1, 'race-walking');
+      PRAGMA user_version = 1;
+    `);
+    await migrateDatabase(db);
+    assert.equal(await getPreferredActivity(db), 'race-walking');
+    assert.deepEqual(await listAttempts(db, 'running-v1'), []);
+    assert.equal(
+      (await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))
+        ?.user_version,
+      2,
+    );
+  } finally {
+    sqlite.close();
+  }
+});
+
+test('an attempt ends once and is rated once', async () => {
+  const { db, sqlite } = connect();
+  try {
+    await migrateDatabase(db);
+    const id = await startAttempt(db, attempt);
+    await assert.rejects(recordCheck(db, id, 5, false), /already rated/);
+    await finishAttempt(db, id, {
+      status: 'completed',
+      endedAt: '2026-10-16T08:30:00.000Z',
+      activeSeconds: 1710,
+    });
+    await assert.rejects(
+      finishAttempt(db, id, {
+        status: 'ended_early',
+        endedAt: null,
+        activeSeconds: null,
+      }),
+      /already ended/,
+    );
+    await assert.rejects(recordDecision(db, id, 'restart'), /already made/);
+    await assert.rejects(recordCheck(db, id, 11, false), /0 to 10/);
+    await recordCheck(db, id, 9, true);
+    await assert.rejects(recordCheck(db, id, 3, false), /already rated/);
+    await recordDecision(db, id, 'continue');
+    await assert.rejects(recordDecision(db, id, 'restart'), /already made/);
+    const [row] = await listAttempts(db, 'running-v1');
+    assert.deepEqual(row, {
+      id,
+      stage: 1,
+      sessionIndex: 0,
+      isReplay: false,
+      status: 'completed',
+      effort: 9,
+      pain: true,
+      decision: 'continue',
+      startedAt: attempt.startedAt,
+      endedAt: '2026-10-16T08:30:00.000Z',
+      activeSeconds: 1710,
+    });
+  } finally {
+    sqlite.close();
+  }
+});
+
+test('stale sessions become interrupted, never completed', async () => {
+  const { db, sqlite } = connect();
+  try {
+    await migrateDatabase(db);
+    const id = await startAttempt(db, attempt);
+    await interruptStaleAttempts(db);
+    const [row] = await listAttempts(db, 'running-v1');
+    assert.equal(row?.id, id);
+    assert.equal(row?.status, 'interrupted');
+    assert.equal(row?.effort, null);
+    assert.throws(() =>
+      sqlite.exec(`UPDATE session_attempts SET effort = 3, pain = 0`),
+    );
+  } finally {
+    sqlite.close();
+  }
+});
+
+test('schema rejects invalid attempts; reset clears history', async () => {
+  const { db, sqlite } = connect();
+  try {
+    await migrateDatabase(db);
+    await assert.rejects(startAttempt(db, { ...attempt, stage: 10 }));
+    await assert.rejects(startAttempt(db, { ...attempt, sessionIndex: 3 }));
+    await startAttempt(db, attempt);
+    await startAttempt(db, { ...attempt, planVersion: 'other' });
+    assert.equal((await listAttempts(db, 'running-v1')).length, 1);
+    await resetProgress(db);
+    assert.deepEqual(await listAttempts(db, 'running-v1'), []);
+    assert.deepEqual(await listAttempts(db, 'other'), []);
   } finally {
     sqlite.close();
   }
