@@ -5,6 +5,7 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.media.MediaPlayer
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -50,6 +51,7 @@ object SessionEngine {
   private var tts: TextToSpeech? = null
   private var ttsReady = false
   private var pendingSpeech: String? = null
+  private var chime: MediaPlayer? = null
   private var focusRequest: AudioFocusRequest? = null
 
   private val ticker =
@@ -104,8 +106,7 @@ object SessionEngine {
     pausedBy = reason
     status = "paused"
     handler.removeCallbacks(ticker)
-    tts?.stop()
-    releaseFocus()
+    silence()
     emit()
   }
 
@@ -192,10 +193,7 @@ object SessionEngine {
 
   private fun teardown(keepSpeech: Boolean) {
     handler.removeCallbacks(ticker)
-    if (!keepSpeech) {
-      tts?.stop()
-      releaseFocus()
-    }
+    if (!keepSpeech) silence()
     appContext?.let { it.stopService(Intent(it, SessionService::class.java)) }
   }
 
@@ -225,7 +223,7 @@ object SessionEngine {
                 }
               },
             )
-            pendingSpeech?.let { speak(it) }
+            pendingSpeech?.let { speakWord(it) }
           }
           pendingSpeech = null
         }
@@ -238,23 +236,58 @@ object SessionEngine {
       .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
       .build()
 
+  // A chime, then the cue word. Other audio is ducked only while they play.
   private fun announce(text: String) {
     if (vibration) vibrate()
     if (!speech) return
-    if (ttsReady) speak(text) else pendingSpeech = text
-  }
-
-  private fun speak(text: String) {
-    val audio = appContext?.getSystemService(AudioManager::class.java) ?: return
-    // Lower other audio only while speaking.
+    silence()
+    val context = appContext ?: return
+    val audio = context.getSystemService(AudioManager::class.java) ?: return
     val request =
       AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
         .setAudioAttributes(attributes)
         .build()
-    releaseFocus()
     focusRequest = request
     audio.requestAudioFocus(request)
-    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "cue-${SystemClock.elapsedRealtime()}")
+    val player =
+      try {
+        context.resources.openRawResourceFd(R.raw.chime).use { file ->
+          MediaPlayer().apply {
+            setAudioAttributes(attributes)
+            setDataSource(file.fileDescriptor, file.startOffset, file.length)
+            prepare()
+          }
+        }
+      } catch (error: Exception) {
+        null
+      }
+    if (player == null) {
+      speakWord(text)
+      return
+    }
+    chime = player
+    player.setOnCompletionListener {
+      it.release()
+      if (chime === it) chime = null
+      speakWord(text)
+    }
+    player.start()
+  }
+
+  private fun speakWord(text: String) {
+    if (ttsReady) {
+      tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "cue-${SystemClock.elapsedRealtime()}")
+    } else {
+      pendingSpeech = text
+    }
+  }
+
+  private fun silence() {
+    chime?.release()
+    chime = null
+    pendingSpeech = null
+    tts?.stop()
+    releaseFocus()
   }
 
   private fun releaseFocus() {

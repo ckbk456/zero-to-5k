@@ -64,7 +64,7 @@ Recorded in the [roadmap](../roadmap.md#after-mvp): race walking; custom program
 Owned by a native module (Swift/Kotlin); the JavaScript UI only displays its state. Validated in roadmap M1.
 
 - **Timing:** elapsed time from a monotonic clock minus paused time; never by counting UI ticks.
-- **Cues:** at every interval change, a spoken cue ("Run for 3 minutes", "Walk for 90 seconds", "Warm-up: walk for 5 minutes", "Cool-down", "Session complete") plus a vibration. Also "Halfway" and "One minute left" during runs of 5 minutes or longer. _Default:_ system text-to-speech, so no recorded audio is needed.
+- **Cues** (owner decision 2026-10-17: keep it simple): at every interval change, a short chime followed by one spoken word — "Run" or "Walk" — plus a vibration. The session ends with the chime and "Done". No other announcements. The chime is a bundled, generated sound; the word uses the system voice.
 - **Other audio:** other apps' audio is lowered briefly for each cue, then restored. The app never plays continuous sound of its own.
 - **Controls:** Pause/Resume and End (with confirmation). Android: an ongoing notification shows the current interval and remaining time, with Pause/Resume and End. iOS: in-app controls only (_default_; lock-screen controls deferred).
 - **Interruptions** (_defaults_):
@@ -82,7 +82,7 @@ Owned by a native module (Swift/Kotlin); the JavaScript UI only displays its sta
 5. **Post-session check:** effort, pain, recommendation (§3).
 6. **Stage result:** cleared or completed, next stage unlocked; goal-reached screen after stage 9.
 7. **History:** list of sessions with date, stage/session, status, effort, and pain.
-8. **Settings:** vibration on/off, spoken cues on/off, reset progress (typed confirmation; deletes history), about/safety text.
+8. **Settings:** vibration on/off, sound (chime + word) on/off, reset progress (typed confirmation; deletes history), about/safety text.
 
 The existing activity picker is removed from the UI; the stored preference stays as running.
 
@@ -104,7 +104,7 @@ The existing activity picker is removed from the UI; the stored preference stays
 ## 8. Open questions for review
 
 1. Is restarting a stage from session 1 correct, or should a restart repeat only the hard session?
-2. Spoken cue wording and voice: system text-to-speech acceptable for the MVP?
+2. Cue sound: resolved — chime plus "Run"/"Walk" (owner, 2026-10-17).
 3. Interruption defaults in §4: acceptable?
 4. Minimum OS versions: the app installs on iOS 16.4+ and Android 7+ (Expo SDK 57 defaults); screen-off sessions need iOS 26+.
 5. App name: keep "Build to 30"?

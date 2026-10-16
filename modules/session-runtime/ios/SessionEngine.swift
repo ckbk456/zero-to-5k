@@ -18,7 +18,9 @@ struct Segment {
 // Owns session time and cues. Elapsed time comes from a monotonic clock that
 // keeps counting while the device sleeps, minus paused time; ticks only decide
 // when to check it.
-final class SessionEngine: NSObject, AVSpeechSynthesizerDelegate, CXCallObserverDelegate {
+final class SessionEngine: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDelegate,
+  CXCallObserverDelegate
+{
   static let shared = SessionEngine()
 
   var onChange: (([String: Any]) -> Void)?
@@ -40,6 +42,8 @@ final class SessionEngine: NSObject, AVSpeechSynthesizerDelegate, CXCallObserver
 
   private var timer: DispatchSourceTimer?
   private let synthesizer = AVSpeechSynthesizer()
+  private var chime: AVAudioPlayer?
+  private var pendingWord: String?
   private let callObserver = CXCallObserver()
   private let healthStore = HKHealthStore()
   // A WorkoutKeeper on iOS 26+, where iPhone workout sessions exist.
@@ -138,7 +142,7 @@ final class SessionEngine: NSObject, AVSpeechSynthesizerDelegate, CXCallObserver
     pausedAt = Self.now()
     pausedBy = reason
     status = "paused"
-    synthesizer.stopSpeaking(at: .immediate)
+    silence()
     emit()
   }
 
@@ -208,22 +212,55 @@ final class SessionEngine: NSObject, AVSpeechSynthesizerDelegate, CXCallObserver
   private func teardown(keepSpeech: Bool = false) {
     timer?.cancel()
     timer = nil
-    if !keepSpeech { synthesizer.stopSpeaking(at: .immediate) }
+    if !keepSpeech { silence() }
     endBackground()
   }
 
   // MARK: Cues
 
+  // A chime, then the cue word. Other audio is ducked only while they play.
   private func announce(_ text: String) {
     if vibration { AudioServicesPlaySystemSound(kSystemSoundID_Vibrate) }
     guard speech else { return }
     let session = AVAudioSession.sharedInstance()
-    // Lower music and pause spoken audio such as podcasts only while speaking.
-    try? session.setCategory(
-      .playback, mode: .voicePrompt,
-      options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
+    try? session.setCategory(.playback, mode: .default, options: [.duckOthers])
     try? session.setActive(true)
-    synthesizer.speak(AVSpeechUtterance(string: text))
+    synthesizer.stopSpeaking(at: .immediate)
+    pendingWord = text
+    if let player = makeChime() {
+      chime = player
+      player.play()
+    } else {
+      speakPendingWord()
+    }
+  }
+
+  private func makeChime() -> AVAudioPlayer? {
+    let bundles = [Bundle.main, Bundle(for: SessionEngine.self)]
+    let url = bundles.lazy.compactMap { bundle -> URL? in
+      if let resources = bundle.url(forResource: "SessionRuntime", withExtension: "bundle"),
+        let inner = Bundle(url: resources)?.url(forResource: "chime", withExtension: "wav")
+      {
+        return inner
+      }
+      return bundle.url(forResource: "chime", withExtension: "wav")
+    }.first
+    guard let url, let player = try? AVAudioPlayer(contentsOf: url) else { return nil }
+    player.delegate = self
+    return player
+  }
+
+  func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+    speakPendingWord()
+  }
+
+  private func speakPendingWord() {
+    guard let word = pendingWord else {
+      releaseAudio()
+      return
+    }
+    pendingWord = nil
+    synthesizer.speak(AVSpeechUtterance(string: word))
   }
 
   func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance)
@@ -237,8 +274,16 @@ final class SessionEngine: NSObject, AVSpeechSynthesizerDelegate, CXCallObserver
   }
 
   private func releaseAudio() {
-    guard !synthesizer.isSpeaking else { return }
+    guard !synthesizer.isSpeaking, pendingWord == nil, chime?.isPlaying != true else { return }
     try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+  }
+
+  private func silence() {
+    pendingWord = nil
+    chime?.stop()
+    chime = nil
+    synthesizer.stopSpeaking(at: .immediate)
+    releaseAudio()
   }
 
   // MARK: Calls

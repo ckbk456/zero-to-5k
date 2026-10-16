@@ -93,8 +93,8 @@ export function PreviewScreen() {
       </Title>
       <Body muted>{stage.tip}</Body>
       <Body muted>
-        Start your music or podcast, then press Start. You will hear a cue at
-        every change; the screen can turn off.
+        Start your music or podcast, then press Start. You will hear a chime and
+        “run” or “walk” at every change; the screen can turn off.
         {Platform.OS === 'ios'
           ? ' The first time, iOS asks to let Build to 30 save workouts to Apple Health — this is what keeps cues playing with the screen locked.'
           : ''}
