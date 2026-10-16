@@ -20,7 +20,7 @@ Highest risk; everything else depends on it.
 - Versioned plan format: stages → sessions → intervals (seconds), with interval kind `active` or `walk` so race walking can reuse it. Plan definitions are separate from history.
 - Bundle the [running preset plan](design/running-preset-plan.md) as 9 stages.
 - Append a migration for session-attempt history with effort ratings; derive the current stage per [stage progression](design/stage-progression.md).
-- Unit tests cover clearing (all sessions rated 8 or lower), retrying (any 9–10), early stops, and that history is never rewritten.
+- Unit tests cover clearing (all sessions rated 8 or lower, no pain), retry recommendations (any 9–10 or pain), continuing anyway, early stops, and that history is never rewritten.
 
 ## M3 — App screens
 

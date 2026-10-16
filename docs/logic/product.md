@@ -20,7 +20,7 @@ The home screen explains the goal and persists the selected activity. It explici
 ## MVP experience
 
 - A session plays timed run/walk cues with the screen off (phone in a pocket or running pouch), alongside the user's music or podcasts. A screen-on-only timer does not meet the MVP.
-- The program is a game of 9 stages built from the [preset running plan](../design/running-preset-plan.md). A stage is cleared only when all of its sessions are completed with an effort rating of 8 or lower (0–10 scale); otherwise the user retries the stage. See [stage progression](../design/stage-progression.md).
+- The program is a game of 9 stages built from the [preset running plan](../design/running-preset-plan.md). After each session the user rates effort (0–10) and reports pain. A rating of 9–10 or pain makes the app recommend retrying the stage; it never blocks advancing. See [stage progression](../design/stage-progression.md).
 - Individual sessions preview their intervals. Retrying a stage is not failure.
 - The app works without an account.
 
