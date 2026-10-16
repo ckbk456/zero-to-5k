@@ -14,7 +14,7 @@ Beginners still need an entry level they tolerate. The eventual vigorous goal mu
 
 Source: 13 Just Run screenshots reviewed on 2026-10-16. Their marketing language is reference material, not verified medical claims. The original screenshots are not distributed with this repository; the table records the observed interval structure.
 
-The visible plan has three sessions per week and five-minute walking warm-up/cool-down segments. Selected visible exercise blocks are transcribed below; recoveries are excluded from the middle column. Repetition on collapsed days is not independently established by those screenshots.
+The visible plan has three sessions per week and five-minute walking warm-up/cool-down segments. Selected visible exercise blocks are transcribed below; recoveries are excluded from the middle column. Repetition on collapsed days is not independently established by those screenshots. A later, complete screenshot set and the NHS plan are reconciled in the [running preset plan](../design/running-preset-plan.md).
 
 | Visible session | Running blocks, minutes | Total session duration shown |
 | --------------- | ----------------------- | ---------------------------- |
