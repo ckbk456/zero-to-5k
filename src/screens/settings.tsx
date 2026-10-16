@@ -55,7 +55,7 @@ export function SettingsScreen() {
         <Heading>Cues</Heading>
         {(
           [
-            ['speech', 'Spoken cues'],
+            ['speech', 'Sound (chime + "run" / "walk")'],
             ['vibration', 'Vibration'],
           ] as const
         ).map(([key, label]) => (

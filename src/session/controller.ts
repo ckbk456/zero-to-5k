@@ -35,11 +35,7 @@ export async function startSession(
   now: () => Date = () => new Date(),
 ): Promise<number> {
   const session = getSession(RUNNING_PLAN, request.stage, request.sessionIndex);
-  const { segments, cues } = buildSchedule(
-    session,
-    request.stage,
-    request.sessionIndex,
-  );
+  const { segments, cues } = buildSchedule(session);
   const attemptId = await startAttempt(db, {
     planVersion: RUNNING_PLAN.version,
     ...request,

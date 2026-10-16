@@ -13,4 +13,5 @@ Pod::Spec.new do |s|
   s.frameworks = 'HealthKit', 'AVFoundation', 'CallKit', 'AudioToolbox'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
   s.source_files = '**/*.swift'
+  s.resource_bundles = { 'SessionRuntime' => ['chime.wav'] }
 end
