@@ -36,7 +36,7 @@
     "android": "expo start --android",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/storage/database.test.ts",
+    "test": "tsx --test \"src/**/*.test.ts\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
