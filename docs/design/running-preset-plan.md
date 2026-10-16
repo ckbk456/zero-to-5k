@@ -1,6 +1,6 @@
 # Running preset plan
 
-Date: 2026-10-16. Status: proposed MVP preset, pending product-owner approval. Not yet implemented.
+Date: 2026-10-16. Status: MVP preset approved by the product owner on 2026-10-16. Not yet implemented.
 
 ## Sources
 
@@ -29,10 +29,10 @@ Every session starts with a 5-minute walking warm-up and ends with a 5-minute wa
 | 8    | all | R28                          | 38:00 |
 | 9    | all | R30                          | 40:00 |
 
-## Open decision
+## Week 6 day 3
 
-Week 6 day 3: Just Run uses a 22-minute run (20 → 22 → 25 across weeks 5–7); NHS uses 25 minutes. The proposal follows Just Run because the step from 20 minutes is smaller. The product owner should confirm.
+Just Run uses a 22-minute run (20 → 22 → 25 across weeks 5–7); NHS uses 25 minutes. The product owner chose 22 minutes on 2026-10-16 because the step from 20 minutes is smaller.
 
 ## Review status
 
-This is a widely used public structure, not a clinically validated prescription. Approval by the product owner makes it the MVP preset; curriculum review remains a separate release gate.
+This is a widely used public structure, not a clinically validated prescription. Product-owner approval makes it the MVP preset; curriculum review remains a separate release gate.

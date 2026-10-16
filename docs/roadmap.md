@@ -21,11 +21,15 @@ Highest risk; everything else depends on it.
 - Bundle the [running preset plan](design/running-preset-plan.md).
 - Append migrations for the selected plan and session history.
 
-## M3 — Deterministic generator
+## M3 — Pre-generated plan catalog
 
-- `generate({ activity, weeks: 8–24, sessionsPerWeek: 1–7 }) → plan`, pure TypeScript, no AI, no network.
-- Parameters and limits come from the generator research task and owner review; see the [generator proposal](design/program-generator-proposal.md).
-- Unit tests assert bounds: input caps, weekly increase limits, longest continuous block, hard-session spacing, and that every plan ends at the activity goal.
+The input space is small (17 lengths × 7 frequencies = 119 running plans), so plans are generated ahead of time instead of on the device.
+
+- `generatePlan({ activity, weeks: 8–24, sessionsPerWeek: 1–7 }) → Plan | Infeasible`: a pure TypeScript build-time script, no AI, no network. Parameters and limits come from the generator research and owner review; see the [generator proposal](design/program-generator-proposal.md).
+- The script writes a committed catalog; the app only looks plans up. Catalog changes show up as reviewable diffs, and a plan version is stored with history.
+- Tests check that the committed catalog matches the script output and that every plan meets the limits: input caps, weekly increase limits, longest continuous block, hard-session spacing, and reaching the activity goal.
+- The (9 weeks, 3 sessions) entry must match the preset. Infeasible combinations are stored as an explanation with alternatives, not as a plan.
+- The UI may say plans are built from the user's choices; it must not claim live or AI personalization.
 
 ## M4 — App screens
 
