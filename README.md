@@ -23,9 +23,9 @@ npm ci
 npm start
 ```
 
-Scan the QR code using compatible Expo Go. `npm run ios` and `npm run android` open a development session on an already configured simulator/emulator. No backend, credentials, or Expo cloud project is needed.
+The app uses a local native module, so Expo Go is not supported. `npm run ios -- --device` and `npm run android` build and install a development build; see [commands](docs/commands.md). No backend, credentials, or Expo cloud project is needed.
 
-SDK 57 was selected because Expo's setup guidance on 2026-10-16 recommends it for physical-device Expo Go during the SDK 58 transition. Future native background coaching will require development builds and device validation.
+SDK 57 was selected because Expo's setup guidance on 2026-10-16 recommends it for physical-device Expo Go during the SDK 58 transition. Screen-off coaching runs in a native module and requires development builds and device validation.
 
 ```sh
 npm run check          # One-shot formatting, lint, types, real SQLite tests

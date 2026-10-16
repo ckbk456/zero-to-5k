@@ -8,6 +8,26 @@
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "automatic",
     "plugins": ["expo-router", "expo-sqlite"],
-    "experiments": { "typedRoutes": true }
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "bundleIdentifier": "com.khangcao.buildto30",
+      "appleTeamId": "5U4584QFCQ",
+      "supportsTablet": false,
+      "infoPlist": {
+        "UIBackgroundModes": ["audio", "workout-processing"],
+        "NSHealthShareUsageDescription": "Build to 30 does not read your health data.",
+        "NSHealthUpdateUsageDescription": "Build to 30 starts an Apple Health workout session so your run/walk cues keep playing with the screen off."
+      },
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.access": []
+      }
+    },
+    "android": {
+      "package": "com.khangcao.buildto30"
+    },
+    "orientation": "portrait"
   }
 }

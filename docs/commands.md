@@ -15,10 +15,11 @@ Run at the repository root using Node 24.17.0 and npm 11.13.0. Exact scripts are
 | Compatibility     | `npx expo install --check` | Installed Expo CLI        | <1 min       | Low             | Dependency/config gate, may need network            |
 | Diagnostics       | `npm run doctor`           | Pinned expo-doctor        | 1–3 min      | Low             | Conditional, network/provider-dependent             |
 | Dependency audit  | `npm audit`                | npm registry advisories   | <1 min       | Low             | Network-dependent; findings require assessment      |
-| Expo Go server    | `npm start`                | package script            | Long-running | Yes             | Human-owned development; stop afterward             |
-| iOS session       | `npm run ios`              | package script            | Long-running | Yes             | Configured simulator/Expo Go                        |
-| Android session   | `npm run android`          | package script            | Long-running | Yes             | Configured emulator/device                          |
+| Metro server      | `npm start`                | package script            | Long-running | Yes             | Human-owned development; stop afterward             |
+| Native projects   | `npx expo prebuild`        | app.json, local modules   | 1–3 min      | Low             | Regenerates ignored `ios/` and `android/`           |
+| iOS dev build     | `npm run ios -- --device`  | package script            | 5–15 min     | Yes             | Connected iPhone, Xcode signing; serves via Metro   |
+| Android dev build | `npm run android`          | package script            | 5–15 min     | Yes             | Connected device or emulator; serves via Metro      |
 
-No server/database service, production migration command, signed native build, EAS project, or deployment command exists. SQLite migration runs automatically during provider initialization. Add native commands only once native configuration is established.
+No server/database service, production migration command, store-signed build, EAS project, or deployment command exists. A self-contained iOS build for pocket testing: `xcodebuild -workspace ios/Buildto30.xcworkspace -scheme Buildto30 -configuration Release -destination id=<device> -allowProvisioningUpdates build`, then install with `xcrun devicectl device install app`. Android: `cd android && ./gradlew assembleRelease` (debug-signed), then `adb install`. SQLite migration runs automatically during provider initialization.
 
 CI installs and runs the quality gate, dependency compatibility, and mobile export sequentially. Device QA, signing, audio reliability, and curriculum review remain separate. Inspect equivalent processes/cwd before intensive commands and preserve the original session; see `AGENTS.md` for investigation and cleanup rules.
