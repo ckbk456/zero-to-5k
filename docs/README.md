@@ -15,6 +15,7 @@
 - [Program generator research](research/program-generator-research.md)
 - [Program generator](design/program-generator-proposal.md)
 - [Running preset plan](design/running-preset-plan.md)
+- [Stage progression](design/stage-progression.md)
 
 Proposals are not implemented contracts. Research includes optional distance goals; primary completion is time-based. Public documents exclude personal health context and original screenshots. Superseded material belongs in `docs/archive/` when needed, not an empty ceremonial folder.
 

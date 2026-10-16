@@ -20,9 +20,8 @@ The home screen explains the goal and persists the selected activity. It explici
 ## MVP experience
 
 - A session plays timed run/walk cues with the screen off (phone in a pocket or running pouch), alongside the user's music or podcasts. A screen-on-only timer does not meet the MVP.
-- The default running program is the [preset running plan](../design/running-preset-plan.md).
-- A custom running program is generated deterministically, without AI, from two inputs: program length (8–24 weeks) and sessions per week (1–7). Generator rules are a [proposal](../design/program-generator-proposal.md) pending research and owner review.
-- Individual sessions preview their intervals. Repetition is not failure.
+- The program is a game of 9 stages built from the [preset running plan](../design/running-preset-plan.md). A stage is cleared only when all of its sessions are completed with an effort rating of 8 or lower (0–10 scale); otherwise the user retries the stage. See [stage progression](../design/stage-progression.md).
+- Individual sessions preview their intervals. Retrying a stage is not failure.
 - The app works without an account.
 
 Running and race walking share infrastructure but require separate technique/progression content and progress records.
@@ -32,6 +31,7 @@ Running and race walking share infrastructure but require separate technique/pro
 Not planned in detail; listed so MVP decisions do not block them.
 
 - Race-walking program (40-minute goal).
+- Custom program length and "activity days" (2–7 per week) from a deterministic generator; see [generator research](../research/program-generator-research.md).
 - Optional sign-in for paid features. Free features keep working without an account.
 - AI-assisted (Claude) program generation backed by a curated knowledge base. Generated doses must still pass the deterministic limits.
 - Strava, Apple Health, and Android Health Connect integration.

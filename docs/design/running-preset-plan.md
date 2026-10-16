@@ -1,6 +1,6 @@
 # Running preset plan
 
-Date: 2026-10-16. Status: MVP preset approved by the product owner on 2026-10-16. Not yet implemented.
+Date: 2026-10-16. Status: MVP preset approved by the product owner on 2026-10-16. Not yet implemented. Each week is one stage in [stage progression](stage-progression.md).
 
 ## Sources
 

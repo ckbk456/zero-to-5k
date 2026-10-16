@@ -1,6 +1,6 @@
 # Program generator proposal
 
-Date: 2026-10-16. Status: design for discussion; no generator or clinical algorithm implemented. The accepted core outcome is time-based completion, as recorded in `docs/logic/product.md`. Distance and performance goals in this proposal remain optional future scope. MVP inputs are fixed by the product owner: program length 8–24 weeks and 1–7 sessions per week, generated without AI. Numeric parameters for those inputs are pending research and owner review.
+Date: 2026-10-16. Status: design for discussion; no generator or clinical algorithm implemented. The accepted core outcome is time-based completion, as recorded in `docs/logic/product.md`. Distance and performance goals in this proposal remain optional future scope. Deferred after MVP on 2026-10-16: the MVP uses 9 fixed effort-gated stages ([stage progression](stage-progression.md)). Owner decisions retained for when the generator returns: program length 8–24 weeks; an "activity days" input with a minimum of 2 per week; at most 3 running days per week with extra days as optional easy walks; 8-week plans may drop up to 3 repeated preset sessions instead of inventing content. See [generator research](../research/program-generator-research.md).
 
 ## Product recommendation
 
