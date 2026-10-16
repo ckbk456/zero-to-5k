@@ -92,6 +92,24 @@ export function PreviewScreen() {
         Stage {stageNumber} · Session {sessionIndex + 1}
       </Title>
       <Body muted>{stage.tip}</Body>
+      <Body muted>
+        Start your music or podcast, then press Start. You will hear a cue at
+        every change; the screen can turn off.
+        {Platform.OS === 'ios'
+          ? ' The first time, iOS asks to let Build to 30 save workouts to Apple Health — this is what keeps cues playing with the screen locked.'
+          : ''}
+      </Body>
+      {isReplay && (
+        <Body muted>
+          Replays are saved in history and never change progress.
+        </Body>
+      )}
+      {error && <ErrorText>{error}</ErrorText>}
+      <Button
+        label="Start"
+        onPress={() => void start()}
+        disabled={busy || !playable}
+      />
       <Card>
         <Heading>{formatClock(totalSeconds(session))} total</Heading>
         <IntervalBar intervals={session.intervals} />
@@ -116,24 +134,6 @@ export function PreviewScreen() {
           </View>
         ))}
       </Card>
-      <Body muted>
-        Start your music or podcast, then press Start. You will hear a cue at
-        every change; the screen can turn off.
-        {Platform.OS === 'ios'
-          ? ' The first time, iOS asks to let Build to 30 save workouts to Apple Health — this is what keeps cues playing with the screen locked.'
-          : ''}
-      </Body>
-      {isReplay && (
-        <Body muted>
-          Replays are saved in history and never change progress.
-        </Body>
-      )}
-      {error && <ErrorText>{error}</ErrorText>}
-      <Button
-        label="Start"
-        onPress={() => void start()}
-        disabled={busy || !playable}
-      />
     </Screen>
   );
 }
