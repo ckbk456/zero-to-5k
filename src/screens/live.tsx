@@ -8,7 +8,7 @@ import { RUNNING_PLAN, getSession, type Interval } from '@/domain/plan';
 import { SessionRuntime, type RuntimeState } from '@modules/session-runtime';
 import { settle } from '@/session/controller';
 import { listAttempts } from '@/storage/database';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/theme/colors';
 import {
   Body,
   Button,
@@ -33,6 +33,7 @@ function locate(intervals: readonly Interval[], elapsedSeconds: number) {
 }
 
 export function LiveScreen() {
+  const colors = useColors();
   const { attempt } = useLocalSearchParams<{ attempt: string }>();
   const attemptId = Number(attempt);
   const db = useSQLiteContext();
@@ -117,6 +118,7 @@ export function LiveScreen() {
   const { index, interval, remaining } = locate(session.intervals, elapsed);
   const next = session.intervals[index + 1];
   const paused = state.status === 'paused';
+  const running = interval.kind === 'active';
 
   function confirmEnd() {
     Alert.alert(
@@ -136,19 +138,28 @@ export function LiveScreen() {
   return (
     <Screen>
       <Text style={{ color: colors.secondary, fontSize: 16 }}>
-        Stage {target.stage} · Session {target.sessionIndex + 1}
-        {target.isReplay ? ' · Replay' : ''}
+        Stage {target.stage}, session {target.sessionIndex + 1}
+        {target.isReplay ? ' (replay)' : ''}
       </Text>
 
       <View
         accessible
         accessibilityLiveRegion="polite"
         accessibilityLabel={`${INTERVAL_LABELS[interval.kind]}, ${formatClock(remaining)} left`}
-        style={{ alignItems: 'center', paddingVertical: 24, gap: 4 }}
+        style={{
+          alignItems: 'center',
+          paddingVertical: 32,
+          gap: 2,
+          borderRadius: 28,
+          borderCurve: 'continuous',
+          backgroundColor: running ? colors.lane : colors.card,
+          borderWidth: running ? 0 : 1,
+          borderColor: colors.line,
+        }}
       >
         <Text
           style={{
-            color: interval.kind === 'active' ? colors.accent : colors.text,
+            color: running ? colors.onLane : colors.text,
             fontSize: 40,
             fontWeight: '800',
           }}
@@ -157,8 +168,9 @@ export function LiveScreen() {
         </Text>
         <Text
           style={{
-            color: colors.text,
-            fontSize: 80,
+            color: running ? colors.onLane : colors.text,
+            fontSize: 88,
+            lineHeight: 96,
             fontWeight: '200',
             fontVariant: ['tabular-nums'],
           }}
@@ -167,7 +179,11 @@ export function LiveScreen() {
         </Text>
         {paused && (
           <Text
-            style={{ color: colors.warning, fontSize: 20, fontWeight: '600' }}
+            style={{
+              color: running ? colors.onLane : colors.warning,
+              fontSize: 20,
+              fontWeight: '700',
+            }}
           >
             {state.pausedBy === 'call' ? 'Paused for a call' : 'Paused'}
           </Text>

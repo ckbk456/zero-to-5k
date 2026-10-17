@@ -10,7 +10,7 @@ export function StageResultScreen() {
   const { data } = useProgram();
   if (!data) return <Loading label="Loading result" />;
 
-  const state = data.progress.stages[stageNumber - 1];
+  const state = data.progress.stages[stageNumber - 1]?.state;
   const finalStage = stageNumber === RUNNING_PLAN.stages.length;
   const nextTip = RUNNING_PLAN.stages[stageNumber]?.tip;
 
@@ -28,13 +28,13 @@ export function StageResultScreen() {
       ) : (
         <Body>
           You finished every session, though at least one was near your limit or
-          painful. Replaying the stage is always fine.
+          painful. Running its sessions again is always fine.
         </Body>
       )}
       {finalStage ? (
         <Body>
-          You can now run for 30 minutes without stopping. Keep it up with stage
-          9 replays — three times a week is a great habit.
+          You can now run for 30 minutes without stopping. Keep it up with any
+          session — three times a week is a great habit.
         </Body>
       ) : (
         nextTip && (

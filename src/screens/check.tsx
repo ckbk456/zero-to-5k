@@ -11,7 +11,7 @@ import {
 } from '@/domain/progression';
 import { useProgram } from '@/session/use-program';
 import { listAttempts, recordCheck, recordDecision } from '@/storage/database';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/theme/colors';
 import {
   Body,
   Button,
@@ -35,6 +35,7 @@ const ADVICE: Record<Exclude<Recommendation, 'none'>, [string, string]> = {
 };
 
 export function CheckScreen() {
+  const colors = useColors();
   const { attempt } = useLocalSearchParams<{ attempt: string }>();
   const attemptId = Number(attempt);
   const { db, data } = useProgram();
@@ -46,7 +47,7 @@ export function CheckScreen() {
 
   if (!data) return <Loading label="Loading check-in" />;
   const row = data.attempts.find((item) => item.id === attemptId);
-  if (!row || row.status !== 'completed') {
+  if (!row || row.status !== 'completed' || row.source !== 'timed') {
     return (
       <Screen>
         <ErrorText>This session cannot be checked in.</ErrorText>
@@ -64,11 +65,16 @@ export function CheckScreen() {
       : null;
   const shownAdvice = advice ?? (savedAdvice !== 'none' ? savedAdvice : null);
 
+  // Shows the stage result only when this session finished the stage.
   async function finish() {
     const attempts = await listAttempts(db, RUNNING_PLAN.version);
-    const progress = deriveProgress(RUNNING_PLAN, attempts);
-    const state = progress.stages[stageIndex];
-    if (state === 'cleared' || state === 'completed') {
+    const before = deriveProgress(
+      RUNNING_PLAN,
+      attempts.filter((item) => item.id !== attemptId),
+    ).stages[stageIndex]?.state;
+    const after = deriveProgress(RUNNING_PLAN, attempts).stages[stageIndex]
+      ?.state;
+    if ((after === 'cleared' || after === 'completed') && before !== after) {
       router.replace({
         pathname: '/stage-result',
         params: { stage: String(row!.stage) },

@@ -5,11 +5,12 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 
 import { migrateDatabase } from '@/storage/database';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/theme/colors';
 
 export { ErrorBoundary } from 'expo-router';
 
 export default function RootLayout() {
+  const colors = useColors();
   return (
     <Suspense
       fallback={
@@ -20,7 +21,10 @@ export default function RootLayout() {
             backgroundColor: colors.background,
           }}
         >
-          <ActivityIndicator accessibilityLabel="Loading" />
+          <ActivityIndicator
+            color={colors.accent}
+            accessibilityLabel="Loading"
+          />
         </View>
       }
     >
@@ -32,9 +36,16 @@ export default function RootLayout() {
         <Stack
           screenOptions={{
             contentStyle: { backgroundColor: colors.background },
+            headerStyle: { backgroundColor: colors.background },
+            headerShadowVisible: false,
+            headerTintColor: colors.accent,
+            headerTitleStyle: { color: colors.text, fontWeight: '700' },
           }}
         >
-          <Stack.Screen name="index" options={{ title: 'Stages' }} />
+          <Stack.Screen
+            name="index"
+            options={{ title: 'Stages', headerShown: false }}
+          />
           <Stack.Screen
             name="welcome"
             options={{ title: 'Welcome', headerBackVisible: false }}

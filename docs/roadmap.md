@@ -40,7 +40,7 @@ Signed builds, device QA, accessibility, privacy/backup review, curriculum revie
 
 Ideas recorded 2026-10-16, roughly in priority order. Each needs its own scoping, privacy review, and product decision before work starts.
 
-1. **Session picker and practice replays:** choose any unlocked session to retry. Replays count as practice and do not change stage progress unless the owner decides otherwise.
+1. **Session picker** (done 2026-10-17): every session can be previewed, started, or marked done; runs count toward progress.
 2. **Scoring:** one star per session finished at effort ≤ 8 with no pain (3 per stage, 27 total); replays can earn missing stars. Never reward higher effort or faster pace. Weekly targets instead of daily streaks, so rest days are not punished.
 3. **Race-walking program** (40-minute goal); a draft preset is in the [generator research](research/program-generator-research.md) and needs coach review.
 4. **Custom program length and activity days** via the deterministic generator; owner decisions are kept in the [generator proposal](design/program-generator-proposal.md).

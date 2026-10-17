@@ -13,6 +13,7 @@ import {
   getPreferredActivity,
   interruptStaleAttempts,
   listAttempts,
+  markSessionDone,
   recordCheck,
   recordDecision,
   getSettings,
@@ -197,6 +198,7 @@ test('an attempt ends once and is rated once', async () => {
       stage: 1,
       sessionIndex: 0,
       isReplay: false,
+      source: 'timed',
       status: 'completed',
       effort: 9,
       pain: true,
@@ -205,6 +207,39 @@ test('an attempt ends once and is rated once', async () => {
       endedAt: '2026-10-16T08:30:00.000Z',
       activeSeconds: 1710,
     });
+  } finally {
+    sqlite.close();
+  }
+});
+
+test('version 3 rows become timed; marked sessions are never rated', async () => {
+  const { db, sqlite } = connect();
+  try {
+    await migrateDatabase(db);
+    const played = await startAttempt(db, attempt);
+    sqlite.exec(`
+      ALTER TABLE session_attempts DROP COLUMN source;
+      PRAGMA user_version = 3;
+    `);
+    await migrateDatabase(db);
+    const marked = await markSessionDone(db, {
+      planVersion: 'running-v1',
+      stage: 4,
+      sessionIndex: 2,
+      stageAttempt: 1,
+      markedAt: '2026-10-17T09:00:00.000Z',
+    });
+    const [playedRow, markedRow] = await listAttempts(db, 'running-v1');
+    assert.equal(playedRow?.id, played);
+    assert.equal(playedRow?.source, 'timed');
+    assert.equal(markedRow?.id, marked);
+    assert.equal(markedRow?.source, 'manual');
+    assert.equal(markedRow?.status, 'completed');
+    assert.equal(markedRow?.activeSeconds, null);
+    await assert.rejects(recordCheck(db, marked, 5, false), /already rated/);
+    assert.throws(() =>
+      sqlite.exec(`UPDATE session_attempts SET source = 'guess'`),
+    );
   } finally {
     sqlite.close();
   }

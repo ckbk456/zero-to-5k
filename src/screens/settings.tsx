@@ -7,7 +7,7 @@ import {
   updateSettings,
   type Settings,
 } from '@/storage/database';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/theme/colors';
 import {
   Body,
   Button,
@@ -21,6 +21,7 @@ import {
 const CONFIRM_WORD = 'RESET';
 
 export function SettingsScreen() {
+  const colors = useColors();
   const { db, data, reload } = useProgram();
   const [confirm, setConfirm] = useState('');
   const [message, setMessage] = useState<string | null>(null);

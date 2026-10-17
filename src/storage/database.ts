@@ -1,6 +1,7 @@
 import { isActivity, type Activity } from '../domain/activity';
 import type {
   AttemptRecord,
+  AttemptSource,
   AttemptStatus,
   Decision,
 } from '../domain/progression';
@@ -25,7 +26,7 @@ export interface Database extends SqlConnection {
   ): Promise<void>;
 }
 
-export const DATABASE_VERSION = 3;
+export const DATABASE_VERSION = 4;
 
 export async function migrateDatabase(db: Database): Promise<void> {
   const version = await db.getFirstAsync<{ user_version: number }>(
@@ -39,7 +40,7 @@ export async function migrateDatabase(db: Database): Promise<void> {
   if (version.user_version === DATABASE_VERSION) return;
 
   // Append new migrations; never edit a released one.
-  const migrations = [migration1, migration2, migration3];
+  const migrations = [migration1, migration2, migration3, migration4];
   for (const [index, migrate] of migrations.entries()) {
     if (version.user_version > index) continue;
     await db.withExclusiveTransactionAsync(async (transaction) => {
@@ -119,6 +120,14 @@ async function migration3(db: SqlConnection): Promise<void> {
   `);
 }
 
+// Version 4: sessions can be marked done without playing them.
+async function migration4(db: SqlConnection): Promise<void> {
+  await db.execAsync(`
+    ALTER TABLE session_attempts ADD COLUMN source TEXT NOT NULL
+      DEFAULT 'timed' CHECK (source IN ('timed', 'manual'));
+  `);
+}
+
 export interface Settings {
   onboarded: boolean;
   speech: boolean;
@@ -159,6 +168,7 @@ interface AttemptRow {
   stage: number;
   session_index: number;
   is_replay: number;
+  source: AttemptSource;
   status: AttemptStatus;
   effort: number | null;
   pain: number | null;
@@ -179,7 +189,7 @@ export async function listAttempts(
   planVersion: string,
 ): Promise<AttemptHistoryItem[]> {
   const rows = await db.getAllAsync<AttemptRow>(
-    `SELECT id, stage, session_index, is_replay, status, effort, pain,
+    `SELECT id, stage, session_index, is_replay, source, status, effort, pain,
             decision, started_at, ended_at, active_seconds
      FROM session_attempts WHERE plan_version = ? ORDER BY id`,
     planVersion,
@@ -189,6 +199,7 @@ export async function listAttempts(
     stage: row.stage,
     sessionIndex: row.session_index,
     isReplay: row.is_replay === 1,
+    source: row.source,
     status: row.status,
     effort: row.effort,
     pain: row.pain === null ? null : row.pain === 1,
@@ -221,6 +232,33 @@ export async function startAttempt(
     attempt.stageAttempt,
     attempt.isReplay ? 1 : 0,
     attempt.startedAt,
+  );
+  return result.lastInsertRowId;
+}
+
+// Records a session the user marks done without playing it. It counts as
+// done but is never rated, so its stage can be completed but not cleared.
+export async function markSessionDone(
+  db: SqlConnection,
+  attempt: {
+    planVersion: string;
+    stage: number;
+    sessionIndex: number;
+    stageAttempt: number;
+    markedAt: string;
+  },
+): Promise<number> {
+  const result = await db.runAsync(
+    `INSERT INTO session_attempts
+       (plan_version, stage, session_index, stage_attempt, is_replay,
+        started_at, ended_at, status, source)
+     VALUES (?, ?, ?, ?, 0, ?, ?, 'completed', 'manual')`,
+    attempt.planVersion,
+    attempt.stage,
+    attempt.sessionIndex,
+    attempt.stageAttempt,
+    attempt.markedAt,
+    attempt.markedAt,
   );
   return result.lastInsertRowId;
 }
@@ -271,7 +309,8 @@ export async function recordCheck(
   }
   const result = await db.runAsync(
     `UPDATE session_attempts SET effort = ?, pain = ?
-     WHERE id = ? AND status = 'completed' AND effort IS NULL`,
+     WHERE id = ? AND status = 'completed' AND source = 'timed'
+       AND effort IS NULL`,
     effort,
     pain ? 1 : 0,
     id,

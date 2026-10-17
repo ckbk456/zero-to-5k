@@ -3,8 +3,8 @@ import { Text, View } from 'react-native';
 import { effortLevel } from '@/domain/effort';
 import type { AttemptStatus } from '@/domain/progression';
 import { useProgram } from '@/session/use-program';
-import { colors } from '@/theme/colors';
-import { Body, Card, Loading, Screen, formatClock } from '@/ui/kit';
+import { useColors } from '@/theme/colors';
+import { Body, Loading, Screen, formatClock } from '@/ui/kit';
 
 const STATUS_LABELS: Record<AttemptStatus, string> = {
   in_progress: 'In progress',
@@ -14,6 +14,7 @@ const STATUS_LABELS: Record<AttemptStatus, string> = {
 };
 
 export function HistoryScreen() {
+  const colors = useColors();
   const { data } = useProgram();
   if (!data) return <Loading label="Loading history" />;
   const attempts = [...data.attempts].reverse();
@@ -21,11 +22,15 @@ export function HistoryScreen() {
   return (
     <Screen>
       {attempts.length === 0 && (
-        <Body muted>Your sessions will appear here.</Body>
+        <Body muted>
+          No sessions yet. Sessions you run or mark done will appear here.
+        </Body>
       )}
-      {attempts.map((attempt) => {
+      {attempts.map((attempt, index) => {
         const details = [
-          STATUS_LABELS[attempt.status],
+          attempt.source === 'manual'
+            ? 'Marked done'
+            : STATUS_LABELS[attempt.status],
           attempt.activeSeconds !== null
             ? formatClock(attempt.activeSeconds)
             : null,
@@ -37,22 +42,30 @@ export function HistoryScreen() {
           attempt.decision === 'continue' ? 'kept going' : null,
         ].filter(Boolean);
         return (
-          <Card key={attempt.id} style={{ gap: 4 }}>
+          <View
+            key={attempt.id}
+            style={{
+              gap: 4,
+              paddingVertical: 14,
+              borderTopWidth: index === 0 ? 0 : 1,
+              borderTopColor: colors.line,
+            }}
+          >
             <View
               style={{ flexDirection: 'row', justifyContent: 'space-between' }}
             >
               <Text
                 style={{ color: colors.text, fontSize: 17, fontWeight: '600' }}
               >
-                Stage {attempt.stage} · Session {attempt.sessionIndex + 1}
-                {attempt.isReplay ? ' · Replay' : ''}
+                Stage {attempt.stage}, session {attempt.sessionIndex + 1}
+                {attempt.isReplay ? ' (replay)' : ''}
               </Text>
               <Text style={{ color: colors.secondary, fontSize: 15 }}>
                 {new Date(attempt.startedAt).toLocaleDateString()}
               </Text>
             </View>
-            <Body muted>{details.join(' · ')}</Body>
-          </Card>
+            <Body muted>{details.join(', ')}</Body>
+          </View>
         );
       })}
     </Screen>

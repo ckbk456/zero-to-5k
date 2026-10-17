@@ -22,7 +22,7 @@ A beginner runner goes from zero to 30 minutes of continuous running by playing 
 
 ### Not in the MVP
 
-Recorded in the [roadmap](../roadmap.md#after-mvp): race walking; custom program length, activity days, and the generator; picking any session to replay; scoring/stars; streaks and badges; accounts and payments; AI plan generation; Strava/Apple Health/Health Connect; heart rate, GPS, distance, and pace; watch apps; reminders/notifications outside a session; leaderboards; localization; tablets and web.
+Recorded in the [roadmap](../roadmap.md#after-mvp): race walking; custom program length, activity days, and the generator; scoring/stars; streaks and badges; accounts and payments; AI plan generation; Strava/Apple Health/Health Connect; heart rate, GPS, distance, and pace; watch apps; reminders/notifications outside a session; leaderboards; localization; tablets and web.
 
 ## 3. Program and progression
 
@@ -30,8 +30,9 @@ Recorded in the [roadmap](../roadmap.md#after-mvp): race walking; custom program
 
 - Stage _n_ is week _n_ of the [running preset plan](running-preset-plan.md): 3 sessions played in order. Stages 5 and 6 have three different sessions; the others repeat one session three times.
 - Every session: 5-minute walking warm-up, the stage's run/walk intervals, 5-minute walking cool-down.
-- Stage states: **locked**, **current**, **completed** (all 3 sessions done, but at least one recommendation was declined), **cleared** (all 3 sessions done with effort ≤ 8 and no pain).
-- Only the current stage's next session can be started. There is no calendar; rest days are advised in copy (NHS-style), not enforced.
+- Stage states: **not started**, **in progress**, **completed** (all 3 sessions done, but at least one was rated 9–10, painful, unrated, or marked done), **cleared** (each session done at least once at effort ≤ 8 with no pain).
+- Owner decision 2026-10-17: nothing is locked. The user can pick, preview, and start any session of any stage, in any order, or **mark it done** without playing it (for a session run without the app). The app suggests the first session not yet done and, when a picked stage is ahead of that suggestion, says that big jumps are harder on the body; it never blocks. There is no calendar; rest days are advised in copy (NHS-style), not enforced.
+- A marked session counts as done but has no rating, so its stage can be completed, not cleared. Running a session again in control can turn a completed stage into a cleared one.
 
 ### After each completed session
 
@@ -51,9 +52,9 @@ Recorded in the [roadmap](../roadmap.md#after-mvp): race walking; custom program
    - Rating ≤ 8 and no pain: continue normally.
    - Rating 9–10: "That was near your limit. We recommend restarting this stage." Buttons: **Restart stage** (primary) / **Keep going**.
    - Pain: "Rest before your next session. If pain persists or is sharp, get it checked." Same two buttons.
-   - **Restart stage** begins a new attempt at session 1 of the current stage. **Keep going** continues to the next session; the stage can then end as completed, not cleared.
-4. After the third session: stage result screen (cleared or completed), then the next stage unlocks either way.
-5. Completing stage 9 shows a goal-reached screen. The user can then replay stage 9 sessions; replays are recorded but change nothing.
+   - **Restart stage** clears that stage's done sessions and begins a new attempt at session 1. **Keep going** keeps the session done; the stage can then end as completed, not cleared.
+4. When a played session finishes its stage (or turns it from completed to cleared): stage result screen.
+5. Completing stage 9 shows a goal-reached screen. Every later session is recorded like any other.
 
 ### Session ended early
 
@@ -76,11 +77,11 @@ Owned by a native module (Swift/Kotlin); the JavaScript UI only displays its sta
 ## 5. Screens
 
 1. **First launch:** what the app does; who it is for (generally healthy adults); a safety note (stop for chest pain, dizziness, or severe breathlessness; check with a doctor if unsure); Start.
-2. **Stage map (home):** the 9 stages with state, the current stage's 3 sessions, and a button to start the next one.
-3. **Session preview:** interval bar and list, total duration, short stage tip, Start. Asks for notification permission on Android, and for Apple Health workout permission on iOS, the first time.
+2. **Stage map (home):** a picker of the 9 stages with state; the picked stage (default: the suggested one) with its tip, interval bar, and 3 sessions, each opening its preview.
+3. **Session preview:** interval bar labelled in minutes with the total, interval list, short stage tip, Start, and Mark as done (for sessions not yet done). Asks for notification permission on Android, and for Apple Health workout permission on iOS, the first time.
 4. **Live session:** see §4.
 5. **Post-session check:** effort, pain, recommendation (§3).
-6. **Stage result:** cleared or completed, next stage unlocked; goal-reached screen after stage 9.
+6. **Stage result:** cleared or completed; goal-reached screen after stage 9.
 7. **History:** list of sessions with date, stage/session, status, effort, and pain.
 8. **Settings:** vibration on/off, sound (chime + word) on/off, reset progress (typed confirmation; deletes history), about/safety text.
 
@@ -90,13 +91,14 @@ The existing activity picker is removed from the UI; the stored preference stays
 
 - **Plan:** bundled TypeScript data, version `running-v1`: stages → sessions → intervals `{ kind: 'warmup' | 'active' | 'walk' | 'cooldown', seconds }`.
 - **Migration 2 (append-only):** `session_attempts` table: id, plan version, stage, session index, stage attempt number, started at, ended at, active seconds, status (`completed` | `ended_early` | `interrupted`), effort (0–10, completed only), pain (completed only), decision (`continue` | `restart`, only when recommended).
-- Current stage, attempt, and stage states are derived from history. History rows are never edited after the session ends, except to add the post-session answers once. Reset deletes all rows.
+- **Migration 4:** `source` (`timed` for played sessions, `manual` for sessions marked done). Manual rows are completed, have no time, and are never rated.
+- Suggested session, attempt, and stage states are derived from history. History rows are never edited after the session ends, except to add the post-session answers once. Reset deletes all rows.
 
 ## 7. Acceptance criteria
 
 - A full stage 9 session (40 minutes) on a physical iPhone and Android phone with the screen off and music playing delivers every cue within 2 seconds of its time, with no missed or duplicate cues, and the music recovers its volume after each cue.
 - Pause, resume, and end work from the app (both platforms) and from the notification (Android).
-- Progression logic has unit tests for clearing, both recommendation triggers, Keep going, Restart stage, ended-early sessions, interrupted sessions, and stage 9 replays.
+- Progression logic has unit tests for clearing, both recommendation triggers, Keep going, Restart stage, ended-early sessions, interrupted sessions, any-order sessions, and marked sessions.
 - The plan data equals the [running preset plan](running-preset-plan.md) (tested).
 - The app works in airplane mode and never asks for location or account permissions. On iOS it asks only for permission to save workouts to Apple Health, because an Apple Health workout session (iOS 26+) is the supported way to keep running with the screen locked; it reads and writes no health data. If declined, or below iOS 26, the screen stays on during sessions and the app says so.
 - `npm run check` and `npm run export:mobile` pass; native development builds install on both test phones.

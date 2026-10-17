@@ -20,7 +20,7 @@ The MVP experience below is implemented: welcome and safety screen, stage map, s
 ## MVP experience
 
 - A session plays timed run/walk cues with the screen off (phone in a pocket or running pouch), alongside the user's music or podcasts. A screen-on-only timer does not meet the MVP.
-- The program is a game of 9 stages built from the [preset running plan](../design/running-preset-plan.md). After each session the user rates effort (0–10) and reports pain. A rating of 9–10 or pain makes the app recommend retrying the stage; it never blocks advancing. See [MVP spec](../design/mvp-spec.md).
+- The program is a game of 9 stages built from the [preset running plan](../design/running-preset-plan.md). Nothing is locked: the user can preview, start, or mark done any session; the app suggests the next one. After each session the user rates effort (0–10) and reports pain. A rating of 9–10 or pain makes the app recommend retrying the stage; it never blocks advancing. See [MVP spec](../design/mvp-spec.md).
 - Individual sessions preview their intervals. Retrying a stage is not failure.
 - The app works without an account.
 
@@ -30,7 +30,7 @@ Running and race walking share infrastructure but require separate technique/pro
 
 Not planned in detail; listed so MVP decisions do not block them. Priorities and gamification ideas live in the [roadmap](../roadmap.md#after-mvp).
 
-- Session picker with practice replays, and scoring (stars for sessions in control; never for higher effort or pace).
+- Scoring (stars for sessions in control; never for higher effort or pace).
 - Race-walking program (40-minute goal).
 - Custom program length and "activity days" (2–7 per week) from a deterministic generator; see [generator research](../research/program-generator-research.md).
 - Optional sign-in for paid features. Free features keep working without an account.
