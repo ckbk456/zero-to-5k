@@ -83,7 +83,7 @@ export function HomeScreen() {
         <Title>Build to 30</Title>
         <Body muted>
           Nine stages to 30 minutes of running without stopping. Start with
-          stage 1 or pick any stage.
+          stage 1 or tap any stage below.
         </Body>
       </View>
 
@@ -140,8 +140,9 @@ export function HomeScreen() {
   );
 }
 
-// Nine numbered lanes. Done stages are filled; a stage in progress shows a
-// dot per session.
+// A stepper: nine numbered stops on one line, so it reads as a sequence.
+// Finished stages are filled and the line between them fills in; the picked
+// stage gets a ring. Session-level detail lives in the panel below.
 function StagePicker({
   stages,
   selected,
@@ -152,63 +153,102 @@ function StagePicker({
   onSelect: (stage: number) => void;
 }) {
   const colors = useColors();
+  const finished = stages.map(
+    (stage) => stage.state === 'completed' || stage.state === 'cleared',
+  );
+  const finishedCount = finished.filter(Boolean).length;
   return (
-    <View accessibilityRole="tablist" style={{ flexDirection: 'row', gap: 5 }}>
-      {stages.map((stage, index) => {
-        const number = index + 1;
-        const isSelected = number === selected;
-        const finished =
-          stage.state === 'completed' || stage.state === 'cleared';
-        return (
-          <Pressable
-            key={number}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: isSelected }}
-            accessibilityLabel={`Stage ${number}, ${STATE_LABELS[stage.state]}`}
-            hitSlop={{ top: 6, bottom: 6 }}
-            onPress={() => onSelect(number)}
-            style={({ pressed }) => ({
-              flex: 1,
-              height: 52,
-              borderRadius: 12,
-              borderCurve: 'continuous',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: finished ? colors.accent : colors.card,
-              borderWidth: isSelected ? 2.5 : 1,
-              borderColor: isSelected ? colors.text : colors.line,
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <Text
-              style={{
-                color: finished ? colors.onAccent : colors.text,
-                fontSize: 18,
-                fontWeight: isSelected ? '800' : '600',
-                fontVariant: ['tabular-nums'],
-              }}
+    <View style={{ gap: 10 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+        }}
+      >
+        <Text style={{ color: colors.text, fontSize: 17, fontWeight: '700' }}>
+          Stages
+        </Text>
+        <Text style={{ color: colors.secondary, fontSize: 15 }}>
+          {finishedCount} of {stages.length} done
+        </Text>
+      </View>
+      <View accessibilityRole="tablist" style={{ flexDirection: 'row' }}>
+        {stages.map((stage, index) => {
+          const number = index + 1;
+          const isSelected = number === selected;
+          const done = finished[index]!;
+          return (
+            <Pressable
+              key={number}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isSelected }}
+              accessibilityLabel={`Stage ${number}, ${STATE_LABELS[stage.state]}`}
+              hitSlop={{ top: 8, bottom: 8 }}
+              onPress={() => onSelect(number)}
+              style={({ pressed }) => ({
+                flex: 1,
+                height: 40,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.6 : 1,
+              })}
             >
-              {number}
-            </Text>
-            {stage.state === 'in_progress' && (
-              <View style={{ flexDirection: 'row', gap: 3, marginTop: 3 }}>
-                {stage.done.map((done, session) => (
-                  <View
-                    key={session}
-                    style={{
-                      width: 5,
-                      height: 5,
-                      borderRadius: 2.5,
-                      backgroundColor: done ? colors.accent : colors.line,
-                    }}
-                  />
-                ))}
+              {index > 0 && <Connector left filled={finished[index - 1]!} />}
+              {index < stages.length - 1 && <Connector filled={done} />}
+              <View
+                style={{
+                  width: isSelected ? 34 : 28,
+                  height: isSelected ? 34 : 28,
+                  borderRadius: 17,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: done ? colors.accent : colors.background,
+                  borderWidth: isSelected ? 2.5 : 1.5,
+                  borderColor: isSelected
+                    ? colors.text
+                    : done || stage.state === 'in_progress'
+                      ? colors.accent
+                      : colors.line,
+                }}
+              >
+                <Text
+                  style={{
+                    color: done
+                      ? colors.onAccent
+                      : isSelected
+                        ? colors.text
+                        : colors.secondary,
+                    fontSize: isSelected ? 15 : 13,
+                    fontWeight: isSelected ? '800' : '600',
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  {number}
+                </Text>
               </View>
-            )}
-          </Pressable>
-        );
-      })}
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
+  );
+}
+
+// Half of the line joining two stops, drawn behind the circle.
+function Connector({ left, filled }: { left?: boolean; filled: boolean }) {
+  const colors = useColors();
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        top: 19,
+        height: 2,
+        left: left ? 0 : '50%',
+        right: left ? '50%' : 0,
+        backgroundColor: filled ? colors.accent : colors.line,
+      }}
+    />
   );
 }
 
