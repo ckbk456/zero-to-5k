@@ -2,10 +2,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  PLANS,
+  RACE_WALKING_PLAN,
   RUNNING_PLAN,
   SESSIONS_PER_STAGE,
   getSession,
+  planByVersion,
   totalSeconds,
+  type Session,
 } from './plan';
 
 // Expected main blocks from docs/design/running-preset-plan.md, in minutes,
@@ -67,4 +71,105 @@ test('the final stage reaches the 30-minute goal', () => {
     seconds: 1800,
   });
   assert.throws(() => getSession(RUNNING_PLAN, 10, 0), /Unknown/);
+});
+
+// P4 rows from docs/design/race-walking-preset-plan.md: main block in
+// minutes (race walk and walk alternating), race-walk minutes, and the full
+// session total. Every stage repeats one session.
+function bouts(minutes: number, count: number): number[] {
+  return Array.from({ length: count }, () => [minutes, 1.5])
+    .flat()
+    .slice(0, -1);
+}
+
+const raceWalkingPreset: [number[], number, number][] = [
+  [bouts(0.5, 6), 3, 20.5],
+  [bouts(1, 6), 6, 23.5],
+  [bouts(1.5, 6), 9, 26.5],
+  [bouts(2, 6), 12, 29.5],
+  [bouts(3, 5), 15, 31],
+  [bouts(4, 4), 16, 30.5],
+  [bouts(5, 4), 20, 34.5],
+  [bouts(7, 3), 21, 34],
+  [[10, 1.5, 10, 1.5, 5], 25, 38],
+  [[15, 1.5, 15], 30, 41.5],
+  [[20, 1.5, 10], 30, 41.5],
+  [[25, 1.5, 5], 30, 41.5],
+  [[25], 25, 35],
+  [[30], 30, 40],
+  [[35], 35, 45],
+  [[40], 40, 50],
+];
+
+function activeMinutes(session: Session): number {
+  return (
+    session.intervals
+      .filter((interval) => interval.kind === 'active')
+      .reduce((sum, interval) => sum + interval.seconds, 0) / 60
+  );
+}
+
+function longestBout(session: Session): number {
+  return Math.max(
+    ...session.intervals
+      .filter((interval) => interval.kind === 'active')
+      .map((interval) => interval.seconds / 60),
+  );
+}
+
+test('the race-walking plan matches the P4 draft preset', () => {
+  assert.equal(RACE_WALKING_PLAN.version, 'race-walking-v1');
+  assert.equal(RACE_WALKING_PLAN.activity, 'race-walking');
+  assert.equal(RACE_WALKING_PLAN.stages.length, 16);
+  for (const [
+    stageIndex,
+    [main, active, total],
+  ] of raceWalkingPreset.entries()) {
+    const stage = RACE_WALKING_PLAN.stages[stageIndex]!;
+    assert.equal(stage.number, stageIndex + 1);
+    assert.equal(stage.sessions.length, SESSIONS_PER_STAGE);
+    for (const session of stage.sessions) {
+      const intervals = session.intervals;
+      assert.deepEqual(intervals[0], { kind: 'warmup', seconds: 300 });
+      assert.deepEqual(intervals.at(-1), { kind: 'cooldown', seconds: 300 });
+      const block = intervals.slice(1, -1);
+      assert.deepEqual(
+        block.map((interval) => interval.seconds / 60),
+        main,
+      );
+      block.forEach((interval, index) =>
+        assert.equal(interval.kind, index % 2 === 0 ? 'active' : 'walk'),
+      );
+      assert.equal(activeMinutes(session), active);
+      assert.equal(totalSeconds(session), total * 60);
+    }
+  }
+});
+
+test('race-walking steps stay within the P4 envelopes', () => {
+  const sessions = RACE_WALKING_PLAN.stages.map((stage) => stage.sessions[0]!);
+  for (let index = 1; index < sessions.length; index += 1) {
+    const [before, after] = [sessions[index - 1]!, sessions[index]!];
+    assert.ok(longestBout(after) - longestBout(before) <= 5);
+    assert.ok(activeMinutes(after) - activeMinutes(before) <= 5);
+    assert.ok(totalSeconds(after) - totalSeconds(before) <= 5 * 60);
+  }
+  for (const session of sessions) {
+    for (const interval of session.intervals) {
+      if (interval.kind === 'walk') assert.equal(interval.seconds, 90);
+    }
+  }
+  assert.equal(RACE_WALKING_PLAN.goalSeconds, 2400);
+  assert.deepEqual(getSession(RACE_WALKING_PLAN, 16, 2).intervals[1], {
+    kind: 'active',
+    seconds: 2400,
+  });
+});
+
+test('each activity has its own plan, found by version', () => {
+  for (const [activity, plan] of Object.entries(PLANS)) {
+    assert.equal(plan.activity, activity);
+    assert.equal(planByVersion(plan.version), plan);
+  }
+  assert.equal(planByVersion('running-v0'), null);
 });

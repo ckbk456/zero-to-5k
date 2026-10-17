@@ -4,7 +4,7 @@
 import type { RuntimeState, StartConfig } from '@modules/session-runtime';
 
 import { buildSchedule } from '../domain/cues';
-import { RUNNING_PLAN, getSession } from '../domain/plan';
+import { getSession, type Plan } from '../domain/plan';
 import {
   finishAttempt,
   interruptStaleAttempts,
@@ -30,14 +30,15 @@ export interface SessionRequest {
 export async function startSession(
   db: SqlConnection,
   runtime: Runtime,
+  plan: Plan,
   request: SessionRequest,
   settings: Pick<Settings, 'speech' | 'vibration'>,
   now: () => Date = () => new Date(),
 ): Promise<number> {
-  const session = getSession(RUNNING_PLAN, request.stage, request.sessionIndex);
-  const { segments, cues } = buildSchedule(session);
+  const session = getSession(plan, request.stage, request.sessionIndex);
+  const { segments, cues } = buildSchedule(session, plan.activity);
   const attemptId = await startAttempt(db, {
-    planVersion: RUNNING_PLAN.version,
+    planVersion: plan.version,
     ...request,
     startedAt: now().toISOString(),
   });

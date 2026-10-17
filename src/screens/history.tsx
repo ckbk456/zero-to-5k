@@ -1,5 +1,6 @@
 import { Text, View } from 'react-native';
 
+import { ACTIVITY_COPY } from '@/domain/activity';
 import { effortLevel } from '@/domain/effort';
 import type { AttemptStatus } from '@/domain/progression';
 import { useProgram } from '@/session/use-program';
@@ -18,12 +19,15 @@ export function HistoryScreen() {
   const { data } = useProgram();
   if (!data) return <Loading label="Loading history" />;
   const attempts = [...data.attempts].reverse();
+  const copy = ACTIVITY_COPY[data.plan.activity];
 
   return (
     <Screen>
+      <Body muted>{copy.name} program</Body>
       {attempts.length === 0 && (
         <Body muted>
-          No sessions yet. Sessions you run or mark done will appear here.
+          No sessions yet. Sessions you {copy.verb} or mark done will appear
+          here.
         </Body>
       )}
       {attempts.map((attempt, index) => {

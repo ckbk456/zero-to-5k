@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Switch, Text, TextInput, View } from 'react-native';
 
+import { ACTIVITY_COPY } from '@/domain/activity';
 import { useProgram } from '@/session/use-program';
 import {
   resetProgress,
@@ -27,6 +28,9 @@ export function SettingsScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   if (!data) return <Loading label="Loading settings" />;
+  const { plan } = data;
+  const copy = ACTIVITY_COPY[plan.activity];
+  const program = copy.name.toLowerCase();
 
   async function toggle(key: 'speech' | 'vibration', value: boolean) {
     setError(null);
@@ -41,7 +45,7 @@ export function SettingsScreen() {
   async function reset() {
     setError(null);
     try {
-      await resetProgress(db);
+      await resetProgress(db, plan.version);
       setConfirm('');
       setMessage('Progress reset. You are back at stage 1.');
       await reload();
@@ -56,7 +60,10 @@ export function SettingsScreen() {
         <Heading>Cues</Heading>
         {(
           [
-            ['speech', 'Sound (chime + "run" / "walk")'],
+            [
+              'speech',
+              `Sound (chime + "${copy.active.toLowerCase()}" / "walk")`,
+            ],
             ['vibration', 'Vibration'],
           ] as const
         ).map(([key, label]) => (
@@ -81,10 +88,10 @@ export function SettingsScreen() {
       </Card>
 
       <Card>
-        <Heading>Reset progress</Heading>
+        <Heading>Reset {program} progress</Heading>
         <Body muted>
-          Deletes all session history and returns you to stage 1. Type{' '}
-          {CONFIRM_WORD} to confirm.
+          Deletes your {program} history and returns you to stage 1. The other
+          program keeps its progress. Type {CONFIRM_WORD} to confirm.
         </Body>
         <TextInput
           accessibilityLabel={`Type ${CONFIRM_WORD} to confirm`}
@@ -104,7 +111,7 @@ export function SettingsScreen() {
           }}
         />
         <Button
-          label="Reset progress"
+          label={`Reset ${program} progress`}
           kind="danger"
           disabled={confirm.trim() !== CONFIRM_WORD}
           onPress={() => void reset()}
@@ -120,6 +127,12 @@ export function SettingsScreen() {
           Build to 30 takes generally healthy adults from walking to 30 minutes
           of continuous running in 9 stages, based on the widely used NHS Couch
           to 5K structure. It is not medical advice or a rehabilitation program.
+        </Body>
+        <Body>
+          The race-walking program builds to 40 minutes of continuous race
+          walking in 16 stages. It is a draft written for this app and has not
+          been reviewed by a coach yet. The app times your practice; it cannot
+          judge whether your technique meets race-walking rules.
         </Body>
         <Body>
           Stop and rest if you feel chest pain, faintness, or severe

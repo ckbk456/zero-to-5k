@@ -37,6 +37,8 @@ export function WelcomeScreen() {
         Build to 30 is a game of 9 stages. Each stage has 3 run/walk sessions.
         Put your phone in your pocket, play your own music or podcast, and the
         app tells you when to run and when to walk — even with the screen off.
+        Prefer walking? A 16-stage race-walking program is one tap away on the
+        stage map.
       </Body>
       <Body>
         After each session you rate how hard it felt. If it was near your limit

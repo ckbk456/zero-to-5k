@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 
-import { RUNNING_PLAN } from '@/domain/plan';
+import { ACTIVITY_COPY } from '@/domain/activity';
 import { useProgram } from '@/session/use-program';
 import { Body, Button, Loading, Screen, Title } from '@/ui/kit';
 
@@ -10,15 +10,18 @@ export function StageResultScreen() {
   const { data } = useProgram();
   if (!data) return <Loading label="Loading result" />;
 
+  const { plan } = data;
+  const copy = ACTIVITY_COPY[plan.activity];
+  const goalMinutes = plan.goalSeconds / 60;
   const state = data.progress.stages[stageNumber - 1]?.state;
-  const finalStage = stageNumber === RUNNING_PLAN.stages.length;
-  const nextTip = RUNNING_PLAN.stages[stageNumber]?.tip;
+  const finalStage = stageNumber === plan.stages.length;
+  const nextTip = plan.stages[stageNumber]?.tip;
 
   return (
     <Screen>
       <Title>
         {finalStage
-          ? 'You did it: 30 minutes! 🎉'
+          ? `You did it: ${goalMinutes} minutes! 🎉`
           : state === 'cleared'
             ? `Stage ${stageNumber} cleared ★`
             : `Stage ${stageNumber} completed ✓`}
@@ -28,13 +31,13 @@ export function StageResultScreen() {
       ) : (
         <Body>
           You finished every session, though at least one was near your limit or
-          painful. Running its sessions again is always fine.
+          painful. {copy.name} its sessions again is always fine.
         </Body>
       )}
       {finalStage ? (
         <Body>
-          You can now run for 30 minutes without stopping. Keep it up with any
-          session — three times a week is a great habit.
+          You can now {copy.verb} for {goalMinutes} minutes without stopping.
+          Keep it up with any session — three times a week is a great habit.
         </Body>
       ) : (
         nextTip && (

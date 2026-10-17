@@ -15,6 +15,7 @@
 - [Program generator research](research/program-generator-research.md)
 - [Program generator](design/program-generator-proposal.md)
 - [Running preset plan](design/running-preset-plan.md)
+- [Race-walking preset plan](design/race-walking-preset-plan.md) — draft, implemented, coach review pending
 - [MVP spec and scope](design/mvp-spec.md) — draft for owner review
 
 Proposals are not implemented contracts. Research includes optional distance goals; primary completion is time-based. Public documents exclude personal health context and original screenshots. Superseded material belongs in `docs/archive/` when needed, not an empty ceremonial folder.

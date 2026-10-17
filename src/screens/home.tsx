@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { Redirect, router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
-import { INTERVAL_LABELS } from '@/domain/cues';
+import { ACTIVITIES, ACTIVITY_COPY, type Activity } from '@/domain/activity';
+import { intervalLabel } from '@/domain/cues';
 import {
-  RUNNING_PLAN,
   SESSIONS_PER_STAGE,
   totalSeconds,
+  type Plan,
   type Session,
 } from '@/domain/plan';
 import type { StageProgress, StageState } from '@/domain/progression';
@@ -14,6 +15,7 @@ import { summarizeSession } from '@/domain/summary';
 import { SessionRuntime } from '@modules/session-runtime';
 import { settle } from '@/session/controller';
 import { useProgram } from '@/session/use-program';
+import { setPreferredActivity } from '@/storage/database';
 import { useColors } from '@/theme/colors';
 import {
   Body,
@@ -47,6 +49,8 @@ export function HomeScreen() {
   const { db, data, error, reload } = useProgram();
   const [settled, setSettled] = useState(false);
   const [picked, setPicked] = useState<number | null>(null);
+  const [switching, setSwitching] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
 
   // Reattach to a live session or record one that ended while away.
   useEffect(() => {
@@ -81,17 +85,43 @@ export function HomeScreen() {
   if (!data || !settled) return <Loading label="Loading your progress" />;
   if (!data.settings.onboarded) return <Redirect href="/welcome" />;
 
-  const { progress } = data;
-  const selected = picked ?? progress.next?.stage ?? RUNNING_PLAN.stages.length;
+  const { plan, progress } = data;
+  const copy = ACTIVITY_COPY[plan.activity];
+  const goalMinutes = plan.goalSeconds / 60;
+  const selected = picked ?? progress.next?.stage ?? plan.stages.length;
+
+  // The selection changes only once it is saved.
+  async function switchTo(activity: Activity) {
+    if (activity === plan.activity) return;
+    setSwitching(true);
+    setSwitchError(null);
+    try {
+      await setPreferredActivity(db, activity);
+      setPicked(null);
+      await reload();
+    } catch {
+      setSwitchError('That did not save. Please try again.');
+    } finally {
+      setSwitching(false);
+    }
+  }
 
   return (
     <Screen edgeToEdge>
       <View style={{ gap: 6 }}>
         <Title>Build to 30</Title>
         <Body muted>
-          Nine stages to 30 minutes of running without stopping. Start with
-          stage 1 or tap any stage below.
+          {copy.intro} Start with stage 1 or tap any stage below.
         </Body>
+      </View>
+
+      <View style={{ gap: 8 }}>
+        <ActivitySwitch
+          selected={plan.activity}
+          disabled={switching}
+          onSelect={(activity) => void switchTo(activity)}
+        />
+        {switchError && <ErrorText>{switchError}</ErrorText>}
       </View>
 
       <StagePicker
@@ -120,16 +150,19 @@ export function HomeScreen() {
 
       {progress.goalReached && (
         <Card>
-          <Heading>You can run for 30 minutes</Heading>
+          <Heading>
+            You can {copy.verb} for {goalMinutes} minutes
+          </Heading>
           <Body muted>
-            Keep it up with any session, three times a week. Every run is saved
-            in your history.
+            Keep it up with any session, three times a week. Every{' '}
+            {copy.active.toLowerCase()} is saved in your history.
           </Body>
         </Card>
       )}
 
       <StagePanel
-        key={selected}
+        key={`${plan.version}-${selected}`}
+        plan={plan}
         number={selected}
         stage={progress.stages[selected - 1]!}
         suggested={progress.next?.stage === selected}
@@ -148,7 +181,68 @@ export function HomeScreen() {
   );
 }
 
-// A stepper: nine numbered stops on one line, so it reads as a sequence.
+// Running and race walking, each with its own stages and history.
+function ActivitySwitch({
+  selected,
+  disabled,
+  onSelect,
+}: {
+  selected: Activity;
+  disabled: boolean;
+  onSelect: (activity: Activity) => void;
+}) {
+  const colors = useColors();
+  return (
+    <View
+      accessibilityRole="tablist"
+      style={{
+        flexDirection: 'row',
+        padding: 3,
+        borderRadius: 14,
+        borderCurve: 'continuous',
+        backgroundColor: colors.track,
+      }}
+    >
+      {ACTIVITIES.map((activity) => {
+        const isSelected = activity === selected;
+        return (
+          <Pressable
+            key={activity}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isSelected, disabled }}
+            disabled={disabled}
+            onPress={() => onSelect(activity)}
+            style={({ pressed }) => ({
+              flex: 1,
+              minHeight: 44,
+              borderRadius: 11,
+              borderCurve: 'continuous',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: isSelected ? colors.accent : 'transparent',
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <Text
+              style={{
+                color: isSelected ? colors.onAccent : colors.secondary,
+                fontSize: 16,
+                fontWeight: isSelected ? '700' : '500',
+              }}
+            >
+              {ACTIVITY_COPY[activity].name}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+// Up to nine stops per line; 16 race-walking stages make two lines of 8.
+const MAX_STOPS_PER_LINE = 9;
+
+// A stepper: numbered stops joined by a line, so it reads as a sequence.
 // Finished stages are filled and the line between them fills in; the picked
 // stage gets a ring. Session-level detail lives in the panel below.
 function StagePicker({
@@ -165,6 +259,12 @@ function StagePicker({
     (stage) => stage.state === 'completed' || stage.state === 'cleared',
   );
   const finishedCount = finished.filter(Boolean).length;
+  const lineCount = Math.ceil(stages.length / MAX_STOPS_PER_LINE);
+  const perLine = Math.ceil(stages.length / lineCount);
+  const stops = stages.map((stage, index) => ({ stage, index }));
+  const lines = Array.from({ length: lineCount }, (_, line) =>
+    stops.slice(line * perLine, (line + 1) * perLine),
+  );
   return (
     <View style={{ gap: 10 }}>
       <View
@@ -181,63 +281,69 @@ function StagePicker({
           {finishedCount} of {stages.length} done
         </Text>
       </View>
-      <View accessibilityRole="tablist" style={{ flexDirection: 'row' }}>
-        {stages.map((stage, index) => {
-          const number = index + 1;
-          const isSelected = number === selected;
-          const done = finished[index]!;
-          return (
-            <Pressable
-              key={number}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={`Stage ${number}, ${STATE_LABELS[stage.state]}`}
-              hitSlop={{ top: 8, bottom: 8 }}
-              onPress={() => onSelect(number)}
-              style={({ pressed }) => ({
-                flex: 1,
-                height: 40,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: pressed ? 0.6 : 1,
-              })}
-            >
-              {index > 0 && <Connector left filled={finished[index - 1]!} />}
-              {index < stages.length - 1 && <Connector filled={done} />}
-              <View
-                style={{
-                  width: isSelected ? 34 : 28,
-                  height: isSelected ? 34 : 28,
-                  borderRadius: 17,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: done ? colors.accent : colors.background,
-                  borderWidth: isSelected ? 2.5 : 1.5,
-                  borderColor: isSelected
-                    ? colors.text
-                    : done || stage.state === 'in_progress'
-                      ? colors.accent
-                      : colors.line,
-                }}
-              >
-                <Text
-                  style={{
-                    color: done
-                      ? colors.onAccent
-                      : isSelected
-                        ? colors.text
-                        : colors.secondary,
-                    fontSize: isSelected ? 15 : 13,
-                    fontWeight: isSelected ? '800' : '600',
-                    fontVariant: ['tabular-nums'],
-                  }}
+      <View accessibilityRole="tablist" style={{ gap: 6 }}>
+        {lines.map((line, lineIndex) => (
+          <View key={lineIndex} style={{ flexDirection: 'row' }}>
+            {line.map(({ stage, index }, position) => {
+              const number = index + 1;
+              const isSelected = number === selected;
+              const done = finished[index]!;
+              return (
+                <Pressable
+                  key={number}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={`Stage ${number}, ${STATE_LABELS[stage.state]}`}
+                  hitSlop={{ top: 8, bottom: 8 }}
+                  onPress={() => onSelect(number)}
+                  style={({ pressed }) => ({
+                    width: `${100 / perLine}%`,
+                    height: 40,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: pressed ? 0.6 : 1,
+                  })}
                 >
-                  {number}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
+                  {position > 0 && (
+                    <Connector left filled={finished[index - 1]!} />
+                  )}
+                  {position < line.length - 1 && <Connector filled={done} />}
+                  <View
+                    style={{
+                      width: isSelected ? 34 : 28,
+                      height: isSelected ? 34 : 28,
+                      borderRadius: 17,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: done ? colors.accent : colors.background,
+                      borderWidth: isSelected ? 2.5 : 1.5,
+                      borderColor: isSelected
+                        ? colors.text
+                        : done || stage.state === 'in_progress'
+                          ? colors.accent
+                          : colors.line,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: done
+                          ? colors.onAccent
+                          : isSelected
+                            ? colors.text
+                            : colors.secondary,
+                        fontSize: isSelected ? 15 : 13,
+                        fontWeight: isSelected ? '800' : '600',
+                        fontVariant: ['tabular-nums'],
+                      }}
+                    >
+                      {number}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -261,16 +367,18 @@ function Connector({ left, filled }: { left?: boolean; filled: boolean }) {
 }
 
 function StagePanel({
+  plan,
   number,
   stage,
   suggested,
 }: {
+  plan: Plan;
   number: number;
   stage: StageProgress;
   suggested: boolean;
 }) {
   const colors = useColors();
-  const plan = RUNNING_PLAN.stages[number - 1]!;
+  const definition = plan.stages[number - 1]!;
   const focus = Math.max(0, stage.done.indexOf(false));
   const [open, setOpen] = useState<number | null>(focus);
   const target = open ?? focus;
@@ -327,11 +435,11 @@ function StagePanel({
       </View>
 
       <Text style={{ color: colors.onLaneMuted, fontSize: 16, lineHeight: 23 }}>
-        {plan.tip}
+        {definition.tip}
       </Text>
 
       <View>
-        {plan.sessions.map((session, index) => {
+        {definition.sessions.map((session, index) => {
           const done = stage.done[index];
           const expanded = open === index;
           return (
@@ -414,8 +522,9 @@ function StagePanel({
                     tone="lane"
                     showTotal={false}
                     intervals={session.intervals}
+                    activity={plan.activity}
                   />
-                  <SessionSteps session={session} />
+                  <SessionSteps session={session} activity={plan.activity} />
                 </View>
               )}
             </View>
@@ -437,9 +546,15 @@ function StagePanel({
   );
 }
 
-// The session's intervals in a few lines: repeated run/walk pairs read as
+// The session's intervals in a few lines: repeated active/walk pairs read as
 // one step with a count.
-function SessionSteps({ session }: { session: Session }) {
+function SessionSteps({
+  session,
+  activity,
+}: {
+  session: Session;
+  activity: Activity;
+}) {
   const colors = useColors();
   return (
     <View style={{ gap: 6 }}>
@@ -467,8 +582,8 @@ function SessionSteps({ session }: { session: Session }) {
               }}
             >
               {step.kind === 'cycle'
-                ? `Run ${formatMinutes(step.run)}, walk ${formatMinutes(step.walk)}`
-                : `${INTERVAL_LABELS[step.interval.kind]} ${formatMinutes(step.interval.seconds)}`}
+                ? `${ACTIVITY_COPY[activity].active} ${formatMinutes(step.active)}, walk ${formatMinutes(step.walk)}`
+                : `${intervalLabel(step.interval.kind, activity)} ${formatMinutes(step.interval.seconds)}`}
             </Text>
             {step.kind === 'cycle' && step.times > 1 && (
               <Text

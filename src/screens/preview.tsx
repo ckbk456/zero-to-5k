@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Alert, PermissionsAndroid, Platform, Text, View } from 'react-native';
 
-import { INTERVAL_LABELS, describeDuration } from '@/domain/cues';
-import { RUNNING_PLAN, getSession } from '@/domain/plan';
+import { ACTIVITY_COPY, type Activity } from '@/domain/activity';
+import { describeDuration, intervalLabel } from '@/domain/cues';
+import { getSession } from '@/domain/plan';
 import { SessionRuntime } from '@modules/session-runtime';
 import { startSession } from '@/session/controller';
 import { useProgram } from '@/session/use-program';
@@ -37,7 +38,9 @@ export function PreviewScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const stage = RUNNING_PLAN.stages[stageNumber - 1];
+  if (!data) return <Loading label="Loading session" />;
+  const { plan } = data;
+  const stage = plan.stages[stageNumber - 1];
   if (!stage || !stage.sessions[sessionIndex]) {
     return (
       <Screen>
@@ -45,9 +48,9 @@ export function PreviewScreen() {
       </Screen>
     );
   }
-  if (!data) return <Loading label="Loading session" />;
 
-  const session = getSession(RUNNING_PLAN, stageNumber, sessionIndex);
+  const copy = ACTIVITY_COPY[plan.activity];
+  const session = getSession(plan, stageNumber, sessionIndex);
   const progress = data.progress.stages[stageNumber - 1]!;
   const alreadyDone = progress.done[sessionIndex] === true;
   const suggestedStage = data.progress.next?.stage;
@@ -62,6 +65,7 @@ export function PreviewScreen() {
       const attemptId = await startSession(
         db,
         SessionRuntime,
+        plan,
         {
           stage: stageNumber,
           sessionIndex,
@@ -85,7 +89,7 @@ export function PreviewScreen() {
     setError(null);
     try {
       await markSessionDone(db, {
-        planVersion: RUNNING_PLAN.version,
+        planVersion: plan.version,
         stage: stageNumber,
         sessionIndex,
         stageAttempt: progress.attempt,
@@ -101,7 +105,7 @@ export function PreviewScreen() {
   function confirmMarkDone() {
     Alert.alert(
       `Mark session ${sessionIndex + 1} as done?`,
-      'Use this for a session you ran without the app. It counts toward the stage but has no effort rating, so the stage can be completed but not cleared.',
+      `Use this for a session you ${copy.past} without the app. It counts toward the stage but has no effort rating, so the stage can be completed but not cleared.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Mark as done', onPress: () => void markDone() },
@@ -118,8 +122,8 @@ export function PreviewScreen() {
         <Body muted>{stage.tip}</Body>
       </View>
 
-      <IntervalBar intervals={session.intervals} />
-      <Legend />
+      <IntervalBar intervals={session.intervals} activity={plan.activity} />
+      <Legend activity={plan.activity} />
 
       {ahead && (
         <Note>
@@ -128,7 +132,9 @@ export function PreviewScreen() {
         </Note>
       )}
       {alreadyDone && (
-        <Body muted>You have done this session. Running it again is fine.</Body>
+        <Body muted>
+          You have done this session. {copy.name} it again is fine.
+        </Body>
       )}
 
       {error && <ErrorText>{error}</ErrorText>}
@@ -146,7 +152,8 @@ export function PreviewScreen() {
 
       <Body muted>
         Start your music or podcast, then press Start. You will hear a chime and
-        “run” or “walk” at every change; the screen can turn off.
+        “{copy.active.toLowerCase()}” or “walk” at every change; the screen can
+        turn off.
         {Platform.OS === 'ios'
           ? ' The first time, iOS asks to let Build to 30 save workouts to Apple Health — this is what keeps cues playing with the screen locked.'
           : ''}
@@ -183,7 +190,7 @@ export function PreviewScreen() {
                   fontWeight: active ? '700' : '400',
                 }}
               >
-                {INTERVAL_LABELS[interval.kind]}
+                {intervalLabel(interval.kind, plan.activity)}
               </Text>
               <Text
                 style={{
@@ -202,13 +209,13 @@ export function PreviewScreen() {
   );
 }
 
-function Legend() {
+function Legend({ activity }: { activity: Activity }) {
   const colors = useColors();
   return (
     <View style={{ flexDirection: 'row', gap: 18 }}>
       {(
         [
-          ['Run', colors.accent],
+          [ACTIVITY_COPY[activity].active, colors.accent],
           ['Walk', colors.walk],
         ] as const
       ).map(([label, color]) => (

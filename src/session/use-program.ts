@@ -2,9 +2,10 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { RUNNING_PLAN } from '@/domain/plan';
+import { PLANS, type Plan } from '@/domain/plan';
 import { deriveProgress, type Progress } from '@/domain/progression';
 import {
+  getPreferredActivity,
   getSettings,
   listAttempts,
   type AttemptHistoryItem,
@@ -12,13 +13,15 @@ import {
 } from '@/storage/database';
 
 export interface ProgramData {
+  // The program of the selected activity; history and progress are its own.
+  plan: Plan;
   settings: Settings;
   attempts: AttemptHistoryItem[];
   progress: Progress;
 }
 
-// Loads settings, history, and derived progress whenever the screen gains
-// focus.
+// Loads the selected program with its settings, history, and derived progress
+// whenever the screen gains focus.
 export function useProgram() {
   const db = useSQLiteContext();
   const [data, setData] = useState<ProgramData | null>(null);
@@ -26,14 +29,17 @@ export function useProgram() {
 
   const reload = useCallback(async () => {
     try {
-      const [settings, attempts] = await Promise.all([
+      const [settings, activity] = await Promise.all([
         getSettings(db),
-        listAttempts(db, RUNNING_PLAN.version),
+        getPreferredActivity(db),
       ]);
+      const plan = PLANS[activity];
+      const attempts = await listAttempts(db, plan.version);
       setData({
+        plan,
         settings,
         attempts,
-        progress: deriveProgress(RUNNING_PLAN, attempts),
+        progress: deriveProgress(plan, attempts),
       });
       setError(null);
     } catch {

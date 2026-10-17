@@ -505,6 +505,8 @@ No validated beginner protocol establishing the fixed continuous race-walking en
 
 ## P4: Race-walking preset
 
+Implemented unchanged as the app's `race-walking-v1` plan on 2026-10-18 ([preset record](../design/race-walking-preset-plan.md)); the review gates below still apply.
+
 Proposed default: **16 weeks × 3 nonconsecutive core sessions**, with the same main block on each core day within a week. **Q** means race-walking technique/endurance practice; **W** means ordinary easy walking. Every session adds the fixed **5-minute** ordinary-walk warm-up and **5-minute** cool-down. These are proposed doses, with the goal fixed by the [product contract](../logic/product.md); the physiological literature above does not prescribe this table.
 
 All numeric cells below are **P/A**: original proposed template durations and their sums. The rationale is short initial skill exposure, stable easy recoveries, consolidation of total activity while bouts lengthen, then continuous duration growth. Repeated Q bouts have W1.5 **between bouts only**.

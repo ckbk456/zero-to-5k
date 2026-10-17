@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { RUNNING_PLAN } from './plan';
+import { RACE_WALKING_PLAN, RUNNING_PLAN } from './plan';
 import {
   deriveProgress,
   recommend,
@@ -201,4 +201,30 @@ test('finishing stage 9 reaches the goal, even with earlier gaps', () => {
   assert.equal(progress.next, null);
   assert.equal(progress.pending, null);
   assert.ok(progress.stages.every((stage) => stage.state === 'cleared'));
+});
+
+test('race walking clears the same way across its 16 stages', () => {
+  const fresh = deriveProgress(RACE_WALKING_PLAN, []);
+  assert.equal(fresh.stages.length, 16);
+  assert.deepEqual(fresh.next, { stage: 1, sessionIndex: 0, stageAttempt: 1 });
+
+  const history = Array.from({ length: 15 }, (_, index) =>
+    easyStage(index + 1),
+  ).flat();
+  const almost = deriveProgress(RACE_WALKING_PLAN, history);
+  assert.equal(almost.goalReached, false);
+  assert.deepEqual(almost.next, {
+    stage: 16,
+    sessionIndex: 0,
+    stageAttempt: 1,
+  });
+
+  const progress = deriveProgress(RACE_WALKING_PLAN, [
+    ...history,
+    ...easyStage(16),
+  ]);
+  assert.equal(progress.goalReached, true);
+  assert.ok(progress.stages.every((stage) => stage.state === 'cleared'));
+  // The running plan has no stage 16, so the same rows clear nothing past 9.
+  assert.equal(deriveProgress(RUNNING_PLAN, easyStage(16)).goalReached, false);
 });

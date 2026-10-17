@@ -1,10 +1,11 @@
 import type { Interval, Session } from './plan';
 
-// A session condensed for a glance: each run is paired with the walk after
-// it, and identical back-to-back pairs collapse into one step with a count.
+// A session condensed for a glance: each active interval is paired with the
+// walk after it, and identical back-to-back pairs collapse into one step with
+// a count.
 export type SummaryStep =
   | { kind: 'single'; interval: Interval }
-  | { kind: 'cycle'; run: number; walk: number; times: number };
+  | { kind: 'cycle'; active: number; walk: number; times: number };
 
 export function summarizeSession(session: Session): SummaryStep[] {
   const steps: SummaryStep[] = [];
@@ -29,7 +30,7 @@ export function summarizeSession(session: Session): SummaryStep[] {
     }
     steps.push({
       kind: 'cycle',
-      run: interval.seconds,
+      active: interval.seconds,
       walk: next.seconds,
       times,
     });

@@ -3,7 +3,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
 import { EFFORT_LEVELS, effortLevel } from '@/domain/effort';
-import { RUNNING_PLAN } from '@/domain/plan';
 import {
   deriveProgress,
   recommend,
@@ -46,6 +45,7 @@ export function CheckScreen() {
   const [error, setError] = useState<string | null>(null);
 
   if (!data) return <Loading label="Loading check-in" />;
+  const { plan } = data;
   const row = data.attempts.find((item) => item.id === attemptId);
   if (!row || row.status !== 'completed' || row.source !== 'timed') {
     return (
@@ -67,13 +67,12 @@ export function CheckScreen() {
 
   // Shows the stage result only when this session finished the stage.
   async function finish() {
-    const attempts = await listAttempts(db, RUNNING_PLAN.version);
+    const attempts = await listAttempts(db, plan.version);
     const before = deriveProgress(
-      RUNNING_PLAN,
+      plan,
       attempts.filter((item) => item.id !== attemptId),
     ).stages[stageIndex]?.state;
-    const after = deriveProgress(RUNNING_PLAN, attempts).stages[stageIndex]
-      ?.state;
+    const after = deriveProgress(plan, attempts).stages[stageIndex]?.state;
     if ((after === 'cleared' || after === 'completed') && before !== after) {
       router.replace({
         pathname: '/stage-result',

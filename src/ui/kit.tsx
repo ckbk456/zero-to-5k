@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ACTIVITY_COPY, type Activity } from '@/domain/activity';
 import type { Interval } from '@/domain/plan';
 import { useColors } from '@/theme/colors';
 
@@ -260,8 +261,9 @@ function segmentMinutes(seconds: number): string {
   return Number.isInteger(minutes) ? String(minutes) : minutes.toFixed(1);
 }
 
-// "28½ min" for 28:30.
+// "28½ min" for 28:30, "30 sec" under a minute.
 export function formatMinutes(seconds: number): string {
+  if (seconds < 60) return `${seconds} sec`;
   const whole = Math.floor(seconds / 60);
   const half = seconds % 60 >= 30 ? '½' : '';
   return `${whole}${half} min`;
@@ -270,15 +272,17 @@ export function formatMinutes(seconds: number): string {
 const MIN_LABEL_WIDTH = 24;
 
 // Proportional strip of a session's intervals, labelled with minutes where
-// they fit, over a bracket with the total. Runs are solid; walks are light.
-// The lane tone is for the deep-blue stage panel.
+// they fit, over a bracket with the total. Active intervals are solid; walks
+// are light. The lane tone is for the deep-blue stage panel.
 export function IntervalBar({
   intervals,
+  activity,
   progress,
   tone = 'plain',
   showTotal = true,
 }: {
   intervals: readonly Interval[];
+  activity: Activity;
   progress?: number;
   tone?: 'plain' | 'lane';
   showTotal?: boolean;
@@ -286,7 +290,8 @@ export function IntervalBar({
   const colors = useColors();
   const [width, setWidth] = useState(0);
   const total = intervals.reduce((sum, interval) => sum + interval.seconds, 0);
-  const runs = intervals.filter((interval) => interval.kind === 'active');
+  const bouts = intervals.filter((interval) => interval.kind === 'active');
+  const copy = ACTIVITY_COPY[activity];
   const gap = 2;
   const usable = width - gap * (intervals.length - 1);
 
@@ -303,7 +308,7 @@ export function IntervalBar({
   return (
     <View
       accessible
-      accessibilityLabel={`${formatMinutes(total)}: ${runs.length} ${runs.length === 1 ? 'run' : 'runs'} between a warm-up and cool-down walk`}
+      accessibilityLabel={`${formatMinutes(total)}: ${bouts.length} ${bouts.length === 1 ? copy.active.toLowerCase() : copy.activePlural} between a warm-up and cool-down walk`}
       style={{ gap: 8 }}
     >
       <View

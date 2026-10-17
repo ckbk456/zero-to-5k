@@ -10,6 +10,7 @@ MVP gate (spec §7). Record device, OS, build, date, tester, and result for each
 6. Force-quit the app mid-session: relaunch records the attempt as "Interrupted" and never credits the unseen time. Android: swiping the app away while the notification is still running reattaches to the live session on relaunch.
 7. Wired and Bluetooth headphones, disconnection mid-session, Silent/Focus modes, low-power/battery-saver modes.
 8. Battery drain over a 40-minute session.
+9. Race walking: a stage 1 session speaks "Race walk" and "Walk" after each chime; a stage 16 session (50 minutes) meets item 1's timing and item 8's battery check.
 
 Agree measurable supported conditions before claiming reliability. Curriculum review is a separate gate.
 

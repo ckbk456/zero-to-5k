@@ -85,14 +85,14 @@ Owned by a native module (Swift/Kotlin); the JavaScript UI only displays its sta
 7. **History:** list of sessions with date, stage/session, status, effort, and pain.
 8. **Settings:** vibration on/off, sound (chime + word) on/off, reset progress (typed confirmation; deletes history), about/safety text.
 
-The existing activity picker is removed from the UI; the stored preference stays as running.
+The existing activity picker is removed from the UI; the stored preference stays as running. (After MVP, 2026-10-18: a Running / Race walking switch on the stage map sets it again; see [product](../logic/product.md#current-app).)
 
 ## 6. Data
 
 - **Plan:** bundled TypeScript data, version `running-v1`: stages → sessions → intervals `{ kind: 'warmup' | 'active' | 'walk' | 'cooldown', seconds }`.
 - **Migration 2 (append-only):** `session_attempts` table: id, plan version, stage, session index, stage attempt number, started at, ended at, active seconds, status (`completed` | `ended_early` | `interrupted`), effort (0–10, completed only), pain (completed only), decision (`continue` | `restart`, only when recommended).
 - **Migration 4:** `source` (`timed` for played sessions, `manual` for sessions marked done). Manual rows are completed, have no time, and are never rated.
-- Suggested session, attempt, and stage states are derived from history. History rows are never edited after the session ends, except to add the post-session answers once. Reset deletes all rows.
+- Suggested session, attempt, and stage states are derived from history. History rows are never edited after the session ends, except to add the post-session answers once. Reset deletes all rows. (After MVP, 2026-10-18: reset deletes only the shown program's rows.)
 
 ## 7. Acceptance criteria
 
