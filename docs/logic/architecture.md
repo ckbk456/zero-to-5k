@@ -1,6 +1,6 @@
 # Architecture and data contract
 
-One Expo SDK 57 / React Native application targets iOS and Android. Routes live in `src/app/`; screen bodies in `src/screens/`; supported activity values in `src/domain/activity.ts`. The UI uses semantic platform colors and safe-area-aware scrolling.
+One Expo SDK 57 / React Native application targets iOS and Android. Routes live in `src/app/`; screen bodies in `src/screens/`; supported activity values in `src/domain/activity.ts`. The UI uses the "blue track" palette in `src/theme/colors.ts` (light and dark, chosen by `useColors()` from the system scheme) and safe-area-aware scrolling.
 
 ## SQLite
 
@@ -9,11 +9,14 @@ One Expo SDK 57 / React Native application targets iOS and Android. Routes live 
 - Version 1: `app_preferences`, singleton `id = 1` with checked `activity` values `running` or `race-walking`. Fresh installs default to running.
 - Version 2: `session_attempts`, one row per started session: plan version, stage (1–9), session index (0–2), stage attempt, replay flag, start/end times, active seconds, status (`in_progress`, `completed`, `ended_early`, `interrupted`), and the post-session effort (0–10), pain, and decision (`continue`/`restart`). Schema checks allow answers only on completed rows. Repository functions end a row exactly once and record the check and decision exactly once; stale `in_progress` rows from a previous process become `interrupted`, never completed.
 
+- Version 3: `onboarded`, `speech`, and `vibration` preferences.
+- Version 4: `session_attempts.source`, `timed` (played by the runtime; existing rows) or `manual` (marked done without playing; completed, no time, never rated).
+
 `PRAGMA user_version` tracks migrations. Existing data survives repeat initialization, and unknown newer versions are rejected without downgrading. WAL and foreign keys are enabled. Keep a single provider/migration owner and append future migrations instead of resetting data.
 
 ## Plan and progression
 
-`src/domain/plan.ts` bundles the approved running plan (`running-v1`): 9 stages × 3 sessions of intervals (`warmup`, `active`, `walk`, `cooldown`) in whole seconds. `src/domain/progression.ts` derives stage states (`locked`, `current`, `completed`, `cleared`), the next session, and any pending check or decision from attempt history, following the [MVP spec](../design/mvp-spec.md). Effort 9–10 or pain only recommends a restart; it never blocks.
+`src/domain/plan.ts` bundles the approved running plan (`running-v1`): 9 stages × 3 sessions of intervals (`warmup`, `active`, `walk`, `cooldown`) in whole seconds. `src/domain/progression.ts` derives per-stage done sessions and states (`not_started`, `in_progress`, `completed`, `cleared`), the suggested next session, and the latest played session's pending check or decision from attempt history. Nothing is locked; a restart decision clears only its own stage, following the [MVP spec](../design/mvp-spec.md). Effort 9–10 or pain only recommends a restart; it never blocks.
 
 The UI confirms a selection only after persistence succeeds, exposes failures, and allows retry. Initialization errors propagate to the Router error boundary. No cloud database, credentials, accounts, analytics, or location recording exists. SQLite is not application-level encrypted; review privacy and backup handling before sensitive records are added.
 

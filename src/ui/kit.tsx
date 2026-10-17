@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,16 +11,25 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Interval } from '@/domain/plan';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/theme/colors';
 
-export function Screen({ children }: { children: ReactNode }) {
+export function Screen({
+  children,
+  edgeToEdge,
+}: {
+  children: ReactNode;
+  // Set when the screen has no navigation header above it.
+  edgeToEdge?: boolean;
+}) {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   return (
     <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
+      contentInsetAdjustmentBehavior={edgeToEdge ? 'never' : 'automatic'}
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={{
         padding: 20,
+        paddingTop: edgeToEdge ? insets.top + 24 : 20,
         paddingBottom: Math.max(insets.bottom, 20) + 12,
         gap: 16,
       }}
@@ -31,6 +40,7 @@ export function Screen({ children }: { children: ReactNode }) {
 }
 
 export function Loading({ label }: { label: string }) {
+  const colors = useColors();
   return (
     <View
       style={{
@@ -39,7 +49,7 @@ export function Loading({ label }: { label: string }) {
         backgroundColor: colors.background,
       }}
     >
-      <ActivityIndicator accessibilityLabel={label} />
+      <ActivityIndicator color={colors.accent} accessibilityLabel={label} />
     </View>
   );
 }
@@ -51,15 +61,18 @@ export function Card({
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
+  const colors = useColors();
   return (
     <View
       style={[
         {
           backgroundColor: colors.card,
-          borderRadius: 16,
+          borderRadius: 20,
           borderCurve: 'continuous',
-          padding: 16,
-          gap: 10,
+          borderWidth: 1,
+          borderColor: colors.line,
+          padding: 18,
+          gap: 12,
         },
         style,
       ]}
@@ -70,10 +83,17 @@ export function Card({
 }
 
 export function Title({ children }: { children: ReactNode }) {
+  const colors = useColors();
   return (
     <Text
       accessibilityRole="header"
-      style={{ color: colors.text, fontSize: 28, fontWeight: '700' }}
+      style={{
+        color: colors.text,
+        fontSize: 30,
+        lineHeight: 36,
+        fontWeight: '800',
+        letterSpacing: -0.5,
+      }}
     >
       {children}
     </Text>
@@ -81,10 +101,16 @@ export function Title({ children }: { children: ReactNode }) {
 }
 
 export function Heading({ children }: { children: ReactNode }) {
+  const colors = useColors();
   return (
     <Text
       accessibilityRole="header"
-      style={{ color: colors.text, fontSize: 20, fontWeight: '600' }}
+      style={{
+        color: colors.text,
+        fontSize: 20,
+        lineHeight: 26,
+        fontWeight: '700',
+      }}
     >
       {children}
     </Text>
@@ -98,12 +124,13 @@ export function Body({
   children: ReactNode;
   muted?: boolean;
 }) {
+  const colors = useColors();
   return (
     <Text
       style={{
         color: muted ? colors.secondary : colors.text,
         fontSize: 16,
-        lineHeight: 23,
+        lineHeight: 24,
       }}
     >
       {children}
@@ -112,17 +139,37 @@ export function Body({
 }
 
 export function ErrorText({ children }: { children: ReactNode }) {
+  const colors = useColors();
   return (
     <Text
       accessibilityRole="alert"
-      style={{ color: colors.danger, fontSize: 16, lineHeight: 23 }}
+      style={{ color: colors.danger, fontSize: 16, lineHeight: 24 }}
     >
       {children}
     </Text>
   );
 }
 
-type ButtonKind = 'primary' | 'secondary' | 'danger';
+// A caution in amber with a rule on its left, for advice that is not an error.
+export function Note({ children }: { children: ReactNode }) {
+  const colors = useColors();
+  return (
+    <View
+      style={{
+        borderLeftWidth: 3,
+        borderLeftColor: colors.warning,
+        paddingLeft: 12,
+        paddingVertical: 2,
+      }}
+    >
+      <Text style={{ color: colors.text, fontSize: 15, lineHeight: 22 }}>
+        {children}
+      </Text>
+    </View>
+  );
+}
+
+type ButtonKind = 'primary' | 'secondary' | 'danger' | 'lane';
 
 export function Button({
   label,
@@ -137,8 +184,14 @@ export function Button({
   disabled?: boolean;
   accessibilityHint?: string;
 }) {
-  const filled = kind === 'primary';
-  const tint = kind === 'danger' ? colors.danger : colors.accent;
+  const colors = useColors();
+  const look = {
+    primary: { fill: colors.accent, ink: colors.onAccent, edge: colors.accent },
+    secondary: { fill: 'transparent', ink: colors.accent, edge: colors.line },
+    danger: { fill: 'transparent', ink: colors.danger, edge: colors.line },
+    // White on the deep-blue stage panel.
+    lane: { fill: colors.onLane, ink: colors.lane, edge: colors.onLane },
+  }[kind];
   return (
     <Pressable
       accessibilityRole="button"
@@ -147,25 +200,20 @@ export function Button({
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 52,
-        borderRadius: 14,
+        minHeight: 54,
+        borderRadius: 27,
         borderCurve: 'continuous',
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        backgroundColor: filled ? tint : 'transparent',
-        borderWidth: filled ? 0 : 2,
-        borderColor: tint,
-        opacity: disabled ? 0.45 : pressed ? 0.75 : 1,
+        paddingHorizontal: 20,
+        backgroundColor: look.fill,
+        borderWidth: 1.5,
+        borderColor: look.edge,
+        opacity: disabled ? 0.4 : pressed ? 0.8 : 1,
+        transform: [{ scale: pressed && !disabled ? 0.98 : 1 }],
       })}
     >
-      <Text
-        style={{
-          color: filled ? colors.onAccent : tint,
-          fontSize: 17,
-          fontWeight: '600',
-        }}
-      >
+      <Text style={{ color: look.ink, fontSize: 17, fontWeight: '700' }}>
         {label}
       </Text>
     </Pressable>
@@ -176,72 +224,129 @@ export function Row({
   label,
   value,
   onPress,
+  last,
 }: {
   label: string;
   value?: string;
   onPress: () => void;
+  last?: boolean;
 }) {
+  const colors = useColors();
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 48,
+        minHeight: 52,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        borderBottomWidth: last ? 0 : 1,
+        borderBottomColor: colors.line,
         opacity: pressed ? 0.6 : 1,
       })}
     >
       <Text style={{ color: colors.text, fontSize: 17 }}>{label}</Text>
-      <Text style={{ color: colors.secondary, fontSize: 17 }}>
+      <Text style={{ color: colors.secondary, fontSize: 20 }}>
         {value ?? '›'}
       </Text>
     </Pressable>
   );
 }
 
-const SEGMENT_OPACITY: Record<Interval['kind'], number> = {
-  warmup: 0.3,
-  walk: 0.3,
-  cooldown: 0.3,
-  active: 1,
-};
+// "1.5" for 90 seconds, "5" for 5 minutes.
+function segmentMinutes(seconds: number): string {
+  const minutes = seconds / 60;
+  return Number.isInteger(minutes) ? String(minutes) : minutes.toFixed(1);
+}
 
-// Proportional bar of a session's intervals. Runs are solid; walks are light.
+// "28½ min" for 28:30.
+export function formatMinutes(seconds: number): string {
+  const whole = Math.floor(seconds / 60);
+  const half = seconds % 60 >= 30 ? '½' : '';
+  return `${whole}${half} min`;
+}
+
+const MIN_LABEL_WIDTH = 24;
+
+// Proportional strip of a session's intervals, labelled with minutes where
+// they fit, over a bracket with the total. Runs are solid; walks are light.
+// The lane tone is for the deep-blue stage panel.
 export function IntervalBar({
   intervals,
   progress,
+  tone = 'plain',
+  showTotal = true,
 }: {
   intervals: readonly Interval[];
   progress?: number;
+  tone?: 'plain' | 'lane';
+  showTotal?: boolean;
 }) {
+  const colors = useColors();
+  const [width, setWidth] = useState(0);
+  const total = intervals.reduce((sum, interval) => sum + interval.seconds, 0);
   const runs = intervals.filter((interval) => interval.kind === 'active');
+  const gap = 2;
+  const usable = width - gap * (intervals.length - 1);
+
+  const run =
+    tone === 'lane'
+      ? { fill: colors.onLane, ink: colors.lane }
+      : { fill: colors.accent, ink: colors.onAccent };
+  const walk =
+    tone === 'lane'
+      ? { fill: colors.laneWalk, ink: colors.onLane }
+      : { fill: colors.walk, ink: colors.text };
+  const bracket = tone === 'lane' ? colors.onLaneMuted : colors.secondary;
+
   return (
     <View
       accessible
-      accessibilityLabel={`${runs.length} ${runs.length === 1 ? 'run' : 'runs'} between a warm-up and cool-down walk`}
-      style={{ gap: 6 }}
+      accessibilityLabel={`${formatMinutes(total)}: ${runs.length} ${runs.length === 1 ? 'run' : 'runs'} between a warm-up and cool-down walk`}
+      style={{ gap: 8 }}
     >
       <View
+        onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
         style={{
           flexDirection: 'row',
-          height: 14,
-          borderRadius: 7,
+          height: 34,
+          borderRadius: 10,
+          borderCurve: 'continuous',
           overflow: 'hidden',
-          gap: 2,
+          gap,
         }}
       >
-        {intervals.map((interval, index) => (
-          <View
-            key={index}
-            style={{
-              flex: interval.seconds,
-              backgroundColor: colors.accent,
-              opacity: SEGMENT_OPACITY[interval.kind],
-            }}
-          />
-        ))}
+        {intervals.map((interval, index) => {
+          const look = interval.kind === 'active' ? run : walk;
+          const fits =
+            width > 0 && (interval.seconds / total) * usable >= MIN_LABEL_WIDTH;
+          return (
+            <View
+              key={index}
+              style={{
+                flex: interval.seconds,
+                backgroundColor: look.fill,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {fits && (
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    color: look.ink,
+                    fontSize: 13,
+                    fontWeight: '700',
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  {segmentMinutes(interval.seconds)}
+                </Text>
+              )}
+            </View>
+          );
+        })}
       </View>
       {progress !== undefined && (
         <View
@@ -261,8 +366,38 @@ export function IntervalBar({
           />
         </View>
       )}
+      {showTotal && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View
+            style={{ flex: 1, height: 8, ...bracketSide(bracket, 'left') }}
+          />
+          <Text
+            style={{
+              color: tone === 'lane' ? colors.onLane : colors.text,
+              fontSize: 15,
+              fontWeight: '600',
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {formatMinutes(total)}
+          </Text>
+          <View
+            style={{ flex: 1, height: 8, ...bracketSide(bracket, 'right') }}
+          />
+        </View>
+      )}
     </View>
   );
+}
+
+function bracketSide(color: string, side: 'left' | 'right'): ViewStyle {
+  return {
+    borderColor: color,
+    borderBottomWidth: 1.5,
+    ...(side === 'left'
+      ? { borderLeftWidth: 1.5, borderBottomLeftRadius: 4 }
+      : { borderRightWidth: 1.5, borderBottomRightRadius: 4 }),
+  };
 }
 
 export function formatClock(totalSeconds: number): string {
