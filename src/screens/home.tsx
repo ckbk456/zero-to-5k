@@ -2,8 +2,15 @@ import { useEffect, useState } from 'react';
 import { Redirect, router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
-import { RUNNING_PLAN, SESSIONS_PER_STAGE, totalSeconds } from '@/domain/plan';
+import { INTERVAL_LABELS } from '@/domain/cues';
+import {
+  RUNNING_PLAN,
+  SESSIONS_PER_STAGE,
+  totalSeconds,
+  type Session,
+} from '@/domain/plan';
 import type { StageProgress, StageState } from '@/domain/progression';
+import { summarizeSession } from '@/domain/summary';
 import { SessionRuntime } from '@modules/session-runtime';
 import { settle } from '@/session/controller';
 import { useProgram } from '@/session/use-program';
@@ -122,6 +129,7 @@ export function HomeScreen() {
       )}
 
       <StagePanel
+        key={selected}
         number={selected}
         stage={progress.stages[selected - 1]!}
         suggested={progress.next?.stage === selected}
@@ -264,6 +272,8 @@ function StagePanel({
   const colors = useColors();
   const plan = RUNNING_PLAN.stages[number - 1]!;
   const focus = Math.max(0, stage.done.indexOf(false));
+  const [open, setOpen] = useState<number | null>(focus);
+  const target = open ?? focus;
   const doneCount = stage.done.filter(Boolean).length;
   const status =
     stage.state === 'cleared'
@@ -320,85 +330,161 @@ function StagePanel({
         {plan.tip}
       </Text>
 
-      <IntervalBar tone="lane" intervals={plan.sessions[focus]!.intervals} />
-
       <View>
         {plan.sessions.map((session, index) => {
           const done = stage.done[index];
+          const expanded = open === index;
           return (
-            <Pressable
+            <View
               key={index}
-              accessibilityRole="button"
-              accessibilityLabel={`Session ${index + 1}, ${formatMinutes(totalSeconds(session))}, ${done ? 'done' : 'not done'}`}
-              accessibilityHint="Opens the session to start it or mark it done"
-              onPress={() => openSession(number, index)}
-              style={({ pressed }) => ({
-                minHeight: 52,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 14,
-                borderTopWidth: 1,
-                borderTopColor: colors.laneLine,
-                opacity: pressed ? 0.6 : 1,
-              })}
+              style={{ borderTopWidth: 1, borderTopColor: colors.laneLine }}
             >
-              <View
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded }}
+                accessibilityLabel={`Session ${index + 1}, ${formatMinutes(totalSeconds(session))}, ${done ? 'done' : 'not done'}`}
+                accessibilityHint={
+                  expanded ? 'Hides its intervals' : 'Shows its intervals'
+                }
+                onPress={() => setOpen(expanded ? null : index)}
+                style={({ pressed }) => ({
+                  minHeight: 52,
+                  flexDirection: 'row',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: done ? colors.onLane : 'transparent',
-                  borderWidth: 2,
-                  borderColor: done ? colors.onLane : colors.onLaneMuted,
-                }}
+                  gap: 14,
+                  opacity: pressed ? 0.6 : 1,
+                })}
               >
-                {done && (
-                  <Text
-                    style={{
-                      color: colors.lane,
-                      fontSize: 14,
-                      fontWeight: '900',
-                    }}
-                  >
-                    ✓
-                  </Text>
-                )}
-              </View>
-              <Text
-                style={{
-                  flex: 1,
-                  color: colors.onLane,
-                  fontSize: 17,
-                  fontWeight: index === focus && !done ? '700' : '500',
-                }}
-              >
-                Session {index + 1}
-              </Text>
-              <Text
-                style={{
-                  color: colors.onLaneMuted,
-                  fontSize: 15,
-                  fontVariant: ['tabular-nums'],
-                }}
-              >
-                {formatMinutes(totalSeconds(session))}
-              </Text>
-              <Text style={{ color: colors.onLaneMuted, fontSize: 20 }}>›</Text>
-            </Pressable>
+                <View
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: done ? colors.onLane : 'transparent',
+                    borderWidth: 2,
+                    borderColor: done ? colors.onLane : colors.onLaneMuted,
+                  }}
+                >
+                  {done && (
+                    <Text
+                      style={{
+                        color: colors.lane,
+                        fontSize: 14,
+                        fontWeight: '900',
+                      }}
+                    >
+                      ✓
+                    </Text>
+                  )}
+                </View>
+                <Text
+                  style={{
+                    flex: 1,
+                    color: colors.onLane,
+                    fontSize: 17,
+                    fontWeight: expanded ? '700' : '500',
+                  }}
+                >
+                  Session {index + 1}
+                </Text>
+                <Text
+                  style={{
+                    color: colors.onLaneMuted,
+                    fontSize: 15,
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  {formatMinutes(totalSeconds(session))}
+                </Text>
+                <Text
+                  style={{
+                    color: colors.onLaneMuted,
+                    fontSize: 20,
+                    transform: [{ rotate: expanded ? '90deg' : '0deg' }],
+                  }}
+                >
+                  ›
+                </Text>
+              </Pressable>
+              {expanded && (
+                <View style={{ gap: 12, paddingBottom: 16 }}>
+                  <IntervalBar
+                    tone="lane"
+                    showTotal={false}
+                    intervals={session.intervals}
+                  />
+                  <SessionSteps session={session} />
+                </View>
+              )}
+            </View>
           );
         })}
       </View>
 
       <Button
         kind="lane"
-        label={`Preview session ${focus + 1}`}
+        label={`Preview session ${target + 1}`}
         accessibilityHint={
-          suggested ? 'This is the next session in your plan' : undefined
+          suggested && target === focus
+            ? 'This is the next session in your plan'
+            : undefined
         }
-        onPress={() => openSession(number, focus)}
+        onPress={() => openSession(number, target)}
       />
+    </View>
+  );
+}
+
+// The session's intervals in a few lines: repeated run/walk pairs read as
+// one step with a count.
+function SessionSteps({ session }: { session: Session }) {
+  const colors = useColors();
+  return (
+    <View style={{ gap: 6 }}>
+      {summarizeSession(session).map((step, index) => {
+        const active = step.kind === 'cycle' || step.interval.kind === 'active';
+        return (
+          <View
+            key={index}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          >
+            <View
+              style={{
+                width: 3,
+                height: 16,
+                borderRadius: 1.5,
+                backgroundColor: active ? colors.onLane : colors.laneWalk,
+              }}
+            />
+            <Text
+              style={{
+                flex: 1,
+                color: active ? colors.onLane : colors.onLaneMuted,
+                fontSize: 15,
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {step.kind === 'cycle'
+                ? `Run ${formatMinutes(step.run)}, walk ${formatMinutes(step.walk)}`
+                : `${INTERVAL_LABELS[step.interval.kind]} ${formatMinutes(step.interval.seconds)}`}
+            </Text>
+            {step.kind === 'cycle' && step.times > 1 && (
+              <Text
+                style={{
+                  color: colors.onLane,
+                  fontSize: 15,
+                  fontWeight: '700',
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                × {step.times}
+              </Text>
+            )}
+          </View>
+        );
+      })}
     </View>
   );
 }
