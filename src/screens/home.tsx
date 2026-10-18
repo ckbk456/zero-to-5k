@@ -198,7 +198,7 @@ export function HomeScreen() {
       )}
 
       <StagePanel
-        key={`${plan.version}-${selected}`}
+        key={`${plan.version}-${selected}-${progress.stages[selected - 1]!.attempt}-${progress.stages[selected - 1]!.done.join(',')}`}
         plan={plan}
         number={selected}
         stage={progress.stages[selected - 1]!}
