@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react';
 import { Redirect, router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
-import { ACTIVITIES, ACTIVITY_COPY, type Activity } from '@/domain/activity';
+import {
+  ACTIVITY_COPY,
+  OFFERED_ACTIVITIES,
+  type Activity,
+} from '@/domain/activity';
 import { intervalLabel } from '@/domain/cues';
 import {
   SESSIONS_PER_STAGE,
@@ -116,14 +120,16 @@ export function HomeScreen() {
         </Body>
       </View>
 
-      <View style={{ gap: 8 }}>
-        <ActivitySwitch
-          selected={plan.activity}
-          disabled={switching}
-          onSelect={(activity) => void switchTo(activity)}
-        />
-        {switchError && <ErrorText>{switchError}</ErrorText>}
-      </View>
+      {OFFERED_ACTIVITIES.length > 1 && (
+        <View style={{ gap: 8 }}>
+          <ActivitySwitch
+            selected={plan.activity}
+            disabled={switching}
+            onSelect={(activity) => void switchTo(activity)}
+          />
+          {switchError && <ErrorText>{switchError}</ErrorText>}
+        </View>
+      )}
 
       <StagePicker
         stages={progress.stages}
@@ -184,7 +190,7 @@ export function HomeScreen() {
   );
 }
 
-// Running and race walking, each with its own stages and history.
+// One tab per offered activity, each with its own stages and history.
 function ActivitySwitch({
   selected,
   disabled,
@@ -206,7 +212,7 @@ function ActivitySwitch({
         backgroundColor: colors.track,
       }}
     >
-      {ACTIVITIES.map((activity) => {
+      {OFFERED_ACTIVITIES.map((activity) => {
         const isSelected = activity === selected;
         return (
           <Pressable

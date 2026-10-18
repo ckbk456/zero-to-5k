@@ -5,6 +5,18 @@ export function isActivity(value: unknown): value is Activity {
   return value === 'running' || value === 'race-walking';
 }
 
+// The programs the app shows. Race walking is the product (owner,
+// 2026-10-18); running stays built and tested but is not offered.
+export const OFFERED_ACTIVITIES: readonly Activity[] = ['race-walking'];
+
+// The saved preference when it is offered, otherwise the first offered
+// activity. Fresh installs store running (migration 1).
+export function offeredActivity(preferred: Activity): Activity {
+  return OFFERED_ACTIVITIES.includes(preferred)
+    ? preferred
+    : OFFERED_ACTIVITIES[0]!;
+}
+
 // Words that change with the activity. `active` names the target-activity
 // interval on screen and is also its spoken cue; recovery is always "walk".
 export interface ActivityCopy {

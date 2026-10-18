@@ -2,6 +2,8 @@
 
 Date: 2026-10-16. Status: **draft for product-owner review — do not build until approved.** Items marked _default_ were chosen by the agent and are open to change; everything else records owner decisions from 2026-10-16.
 
+On 2026-10-18 the product owner made race walking the product ([product](../logic/product.md)). This spec records the running MVP, whose mechanics the race-walking program reuses; where it names running stages, the race-walking equivalent applies (a 40-minute session is race-walking stage 14).
+
 ## 1. Goal
 
 A beginner runner goes from zero to a 5K — 30 minutes of continuous running, about 5 km at 6:00/km — by playing 9 stages of timed run/walk sessions. Sessions work with the phone in a pocket and the screen off, alongside the user's own music or podcasts. Completion is time-based; distance and pace are never required.
@@ -85,7 +87,7 @@ Owned by a native module (Swift/Kotlin); the JavaScript UI only displays its sta
 7. **History:** list of sessions with date, stage/session, status, effort, and pain.
 8. **Settings:** vibration on/off, sound (chime + word) on/off, reset progress (typed confirmation; deletes history), about/safety text.
 
-The existing activity picker is removed from the UI; the stored preference stays as running. (After MVP, 2026-10-18: a Running / Race walking switch on the stage map sets it again; see [product](../logic/product.md#current-app).)
+The existing activity picker is removed from the UI; the stored preference stays as running. (After MVP, 2026-10-18: a Running / Race walking switch on the stage map set it again, then was hidden when race walking became the only program; see [product](../logic/product.md#current-app).)
 
 ## 6. Data
 

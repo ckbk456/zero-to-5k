@@ -34,15 +34,16 @@ export function WelcomeScreen() {
     <Screen>
       <Title>From zero to 5K</Title>
       <Body>
-        Zero to 5K is a game of 9 stages. Each stage has 3 run/walk sessions,
-        building to 30 minutes of running without stopping — about 5 km at 6
-        minutes per km. The app counts time, not distance or speed.
+        Zero to 5K is a game of 16 race-walking stages. Each stage has 3
+        sessions of race walking and easy walking, building to 40 minutes of
+        race walking without stopping — about 5 km at 8 minutes per km. The app
+        counts time, not distance or speed.
       </Body>
       <Body>
         Put your phone in your pocket, play your own music or podcast, and the
-        app tells you when to run and when to walk — even with the screen off.
-        Prefer walking? A 16-stage race-walking program builds to 40 minutes,
-        about 5 km at 8 minutes per km. It is one tap away on the stage map.
+        app tells you when to race walk and when to walk — even with the screen
+        off. Early stages are short practice bouts so you can focus on form. The
+        app times your practice; it cannot judge your technique.
       </Body>
       <Body>
         After each session you rate how hard it felt. If it was near your limit
@@ -59,7 +60,8 @@ export function WelcomeScreen() {
         </Body>
         <Body>
           Stop and rest if you feel chest pain, faintness, or severe
-          breathlessness. Go slow enough to talk — speed does not matter.
+          breathlessness. Go slow enough to talk and keep your form — speed does
+          not matter.
         </Body>
       </Card>
 

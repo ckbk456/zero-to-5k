@@ -1,6 +1,6 @@
 # Zero to 5K
 
-A time-based running and race-walking app for iOS and Android that builds up to a 5 km run or race walk. It counts time, not distance or speed: 30 minutes of running or 40 minutes of race walking, about 5 km at 6:00/km and 8:00/km.
+A time-based race-walking app for iOS and Android that builds up to a 5 km race walk. It counts time, not distance or speed: 40 minutes of continuous race walking, about 5 km at 8:00/km. A 30-minute running program is built but not currently offered.
 
 ## Current status
 

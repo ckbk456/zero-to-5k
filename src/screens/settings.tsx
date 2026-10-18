@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Switch, Text, TextInput, View } from 'react-native';
 
-import { ACTIVITY_COPY } from '@/domain/activity';
+import { ACTIVITY_COPY, OFFERED_ACTIVITIES } from '@/domain/activity';
 import { useProgram } from '@/session/use-program';
 import {
   resetProgress,
@@ -90,8 +90,10 @@ export function SettingsScreen() {
       <Card>
         <Heading>Reset {program} progress</Heading>
         <Body muted>
-          Deletes your {program} history and returns you to stage 1. The other
-          program keeps its progress. Type {CONFIRM_WORD} to confirm.
+          Deletes your {program} history and returns you to stage 1.
+          {OFFERED_ACTIVITIES.length > 1 &&
+            ' The other program keeps its progress.'}{' '}
+          Type {CONFIRM_WORD} to confirm.
         </Body>
         <TextInput
           accessibilityLabel={`Type ${CONFIRM_WORD} to confirm`}
@@ -124,18 +126,16 @@ export function SettingsScreen() {
       <Card>
         <Heading>About and safety</Heading>
         <Body>
-          Zero to 5K takes generally healthy adults from walking to a 5K in 9
-          stages: 30 minutes of continuous running, about 5 km at 6 minutes per
-          km, based on the widely used NHS Couch to 5K structure. The app counts
-          time, not distance or speed; at a slower pace, 5 km takes a little
-          longer. It is not medical advice or a rehabilitation program.
+          Zero to 5K takes generally healthy adults from walking to a 5K race
+          walk in 16 stages: 40 minutes of continuous race walking, about 5 km
+          at 8 minutes per km. The app counts time, not distance or speed; at a
+          slower pace, 5 km takes a little longer. It is not medical advice or a
+          rehabilitation program.
         </Body>
         <Body>
-          The race-walking program builds to 40 minutes of continuous race
-          walking in 16 stages, about 5 km at 8 minutes per km. It is a draft
-          written for this app and has not been reviewed by a coach yet. The app
-          times your practice; it cannot judge whether your technique meets
-          race-walking rules.
+          The program is a draft written for this app and has not been reviewed
+          by a coach yet. The app times your practice; it cannot judge whether
+          your technique meets race-walking rules.
         </Body>
         <Body>
           Stop and rest if you feel chest pain, faintness, or severe

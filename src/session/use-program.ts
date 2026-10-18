@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
+import { offeredActivity } from '@/domain/activity';
 import { PLANS, type Plan } from '@/domain/plan';
 import { deriveProgress, type Progress } from '@/domain/progression';
 import {
@@ -13,7 +14,8 @@ import {
 } from '@/storage/database';
 
 export interface ProgramData {
-  // The program of the selected activity; history and progress are its own.
+  // The program of the selected offered activity; history and progress are
+  // its own.
   plan: Plan;
   settings: Settings;
   attempts: AttemptHistoryItem[];
@@ -33,7 +35,7 @@ export function useProgram() {
         getSettings(db),
         getPreferredActivity(db),
       ]);
-      const plan = PLANS[activity];
+      const plan = PLANS[offeredActivity(activity)];
       const attempts = await listAttempts(db, plan.version);
       setData({
         plan,
