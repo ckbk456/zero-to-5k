@@ -2,14 +2,14 @@
 
 Accepted direction: 2026-10-16; MVP scope and activity targets updated by the product owner the same day. Consult the product owner before changing these outcomes.
 
-Help generally healthy adults build toward three weekly exercise sessions and a continuous time goal. Completing the planned time is a success regardless of distance or pace. `Build to 30` is a working display name; `zero-to-5k` remains the repository identifier.
+Help generally healthy adults build up to a 5 km run or race walk, three sessions a week. The app counts time, not distance or speed: each program's continuous time goal is what 5 km takes at a beginner pace. Completing the planned time is a success regardless of distance or pace. The display name is `Zero to 5K` (product owner, 2026-10-18; it replaced the working name `Build to 30`), matching the `zero-to-5k` repository identifier.
 
-| Activity     | Continuous goal | Rationale (illustrative only) | Scope                              |
-| ------------ | --------------- | ----------------------------- | ---------------------------------- |
-| Running      | 30 minutes      | About 5 km at 6:00/km         | MVP                                |
-| Race walking | 40 minutes      | About 5 km at 8:00/km         | Built after MVP (draft curriculum) |
+| Activity     | Continuous goal | Stands for            | Scope                              |
+| ------------ | --------------- | --------------------- | ---------------------------------- |
+| Running      | 30 minutes      | About 5 km at 6:00/km | MVP                                |
+| Race walking | 40 minutes      | About 5 km at 8:00/km | Built after MVP (draft curriculum) |
 
-The pace column explains why the targets are beginner-friendly. It is not a requirement: the app never asks for distance or pace to complete a session, and the goal minutes are not a claim that the user covered 5 km.
+The pace is what the goal time implies, not a requirement: the app never asks for distance or pace, and it does not check that the user covered 5 km. A slower user covers less ground in the goal time, so the app says the plan makes a 5K "within reach" and shows the pace, rather than saying the user ran 5 km.
 
 The eventual health-oriented target is vigorous aerobic activity. Beginners can start easier; duration and intensity are distinct. Do not count all recovery/warm-up minutes as vigorous, force maximal effort, or position this as diabetes/cardiac rehabilitation.
 

@@ -244,7 +244,7 @@ export function LiveScreen() {
           </Text>
           <Body>
             Cues stop if the phone locks. To {ACTIVITY_COPY[activity].verb} with
-            the screen off, allow Build to 30 to save workouts in the Health app
+            the screen off, allow Zero to 5K to save workouts in the Health app
             (Sharing → Apps), on iOS 26 or later.
           </Body>
         </Card>

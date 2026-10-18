@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Build to 30",
+    "name": "Zero to 5K",
     "slug": "zero-to-5k",
     "version": "0.1.0",
     "scheme": "zeroto5k",
@@ -17,8 +17,8 @@
       "supportsTablet": false,
       "infoPlist": {
         "UIBackgroundModes": ["audio", "workout-processing"],
-        "NSHealthShareUsageDescription": "Build to 30 does not read your health data.",
-        "NSHealthUpdateUsageDescription": "Build to 30 starts an Apple Health workout session so your run/walk cues keep playing with the screen off."
+        "NSHealthShareUsageDescription": "Zero to 5K does not read your health data.",
+        "NSHealthUpdateUsageDescription": "Zero to 5K starts an Apple Health workout session so your workout cues keep playing with the screen off."
       },
       "entitlements": {
         "com.apple.developer.healthkit": true,

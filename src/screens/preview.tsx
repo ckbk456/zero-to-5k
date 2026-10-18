@@ -155,7 +155,7 @@ export function PreviewScreen() {
         “{copy.active.toLowerCase()}” or “walk” at every change; the screen can
         turn off.
         {Platform.OS === 'ios'
-          ? ' The first time, iOS asks to let Build to 30 save workouts to Apple Health — this is what keeps cues playing with the screen locked.'
+          ? ' The first time, iOS asks to let Zero to 5K save workouts to Apple Health — this is what keeps cues playing with the screen locked.'
           : ''}
       </Body>
 

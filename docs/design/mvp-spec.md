@@ -4,7 +4,7 @@ Date: 2026-10-16. Status: **draft for product-owner review — do not build unti
 
 ## 1. Goal
 
-A beginner runner goes from zero to 30 minutes of continuous running by playing 9 stages of timed run/walk sessions. Sessions work with the phone in a pocket and the screen off, alongside the user's own music or podcasts. Completion is time-based; distance and pace are never required.
+A beginner runner goes from zero to a 5K — 30 minutes of continuous running, about 5 km at 6:00/km — by playing 9 stages of timed run/walk sessions. Sessions work with the phone in a pocket and the screen off, alongside the user's own music or podcasts. Completion is time-based; distance and pace are never required.
 
 ## 2. Scope
 
@@ -109,4 +109,4 @@ The existing activity picker is removed from the UI; the stored preference stays
 2. Cue sound: resolved — chime plus "Run"/"Walk" (owner, 2026-10-17).
 3. Interruption defaults in §4: acceptable?
 4. Minimum OS versions: the app installs on iOS 16.4+ and Android 7+ (Expo SDK 57 defaults); screen-off sessions need iOS 26+.
-5. App name: keep "Build to 30"?
+5. App name: resolved — "Zero to 5K"; the goal is a 5 km run measured by time (owner, 2026-10-18).

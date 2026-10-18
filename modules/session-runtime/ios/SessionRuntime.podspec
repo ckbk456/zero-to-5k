@@ -2,7 +2,7 @@ Pod::Spec.new do |s|
   s.name           = 'SessionRuntime'
   s.version        = '1.0.0'
   s.summary        = 'Screen-off workout session timer with spoken cues'
-  s.description    = 'Owns session timing, cues, and background execution for Build to 30.'
+  s.description    = 'Owns session timing, cues, and background execution for Zero to 5K.'
   s.author         = ''
   s.homepage       = 'https://github.com/ckbk456/zero-to-5k'
   s.license        = 'UNLICENSED'

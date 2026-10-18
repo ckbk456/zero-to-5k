@@ -6,6 +6,7 @@ import { ACTIVITIES, ACTIVITY_COPY, type Activity } from '@/domain/activity';
 import { intervalLabel } from '@/domain/cues';
 import {
   SESSIONS_PER_STAGE,
+  goalMinutesPerKm,
   totalSeconds,
   type Plan,
   type Session,
@@ -109,7 +110,7 @@ export function HomeScreen() {
   return (
     <Screen edgeToEdge>
       <View style={{ gap: 6 }}>
-        <Title>Build to 30</Title>
+        <Title>Zero to 5K</Title>
         <Body muted>
           {copy.intro} Start with stage 1 or tap any stage below.
         </Body>
@@ -154,8 +155,10 @@ export function HomeScreen() {
             You can {copy.verb} for {goalMinutes} minutes
           </Heading>
           <Body muted>
-            Keep it up with any session, three times a week. Every{' '}
-            {copy.active.toLowerCase()} is saved in your history.
+            A 5K is within reach: {goalMinutes} minutes is about 5 km at{' '}
+            {goalMinutesPerKm(plan)} minutes per km. Keep it up with any
+            session, three times a week. Every {copy.active.toLowerCase()} is
+            saved in your history.
           </Body>
         </Card>
       )}

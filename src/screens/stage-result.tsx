@@ -36,8 +36,9 @@ export function StageResultScreen() {
       )}
       {finalStage ? (
         <Body>
-          You can now {copy.verb} for {goalMinutes} minutes without stopping.
-          Keep it up with any session — three times a week is a great habit.
+          You can now {copy.verb} for {goalMinutes} minutes without stopping, so
+          a 5K is within reach. Keep it up with any session — three times a week
+          is a great habit.
         </Body>
       ) : (
         nextTip && (

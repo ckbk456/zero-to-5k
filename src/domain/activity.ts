@@ -23,7 +23,8 @@ export const ACTIVITY_COPY: Record<Activity, ActivityCopy> = {
     activePlural: 'runs',
     verb: 'run',
     past: 'ran',
-    intro: 'Nine stages to 30 minutes of running without stopping.',
+    intro:
+      'Nine stages to a 5K: 30 minutes of running without stopping, about 5 km at 6 minutes per km.',
   },
   'race-walking': {
     name: 'Race walking',
@@ -32,6 +33,6 @@ export const ACTIVITY_COPY: Record<Activity, ActivityCopy> = {
     verb: 'race walk',
     past: 'race walked',
     intro:
-      'Sixteen stages to 40 minutes of race walking without stopping. The app times your practice; it cannot judge your technique.',
+      'Sixteen stages to a 5K: 40 minutes of race walking without stopping, about 5 km at 8 minutes per km. The app times your practice; it cannot judge your technique.',
   },
 };

@@ -124,15 +124,18 @@ export function SettingsScreen() {
       <Card>
         <Heading>About and safety</Heading>
         <Body>
-          Build to 30 takes generally healthy adults from walking to 30 minutes
-          of continuous running in 9 stages, based on the widely used NHS Couch
-          to 5K structure. It is not medical advice or a rehabilitation program.
+          Zero to 5K takes generally healthy adults from walking to a 5K in 9
+          stages: 30 minutes of continuous running, about 5 km at 6 minutes per
+          km, based on the widely used NHS Couch to 5K structure. The app counts
+          time, not distance or speed; at a slower pace, 5 km takes a little
+          longer. It is not medical advice or a rehabilitation program.
         </Body>
         <Body>
           The race-walking program builds to 40 minutes of continuous race
-          walking in 16 stages. It is a draft written for this app and has not
-          been reviewed by a coach yet. The app times your practice; it cannot
-          judge whether your technique meets race-walking rules.
+          walking in 16 stages, about 5 km at 8 minutes per km. It is a draft
+          written for this app and has not been reviewed by a coach yet. The app
+          times your practice; it cannot judge whether your technique meets
+          race-walking rules.
         </Body>
         <Body>
           Stop and rest if you feel chest pain, faintness, or severe

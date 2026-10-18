@@ -32,13 +32,17 @@ export function WelcomeScreen() {
 
   return (
     <Screen>
-      <Title>From zero to 30 minutes</Title>
+      <Title>From zero to 5K</Title>
       <Body>
-        Build to 30 is a game of 9 stages. Each stage has 3 run/walk sessions.
+        Zero to 5K is a game of 9 stages. Each stage has 3 run/walk sessions,
+        building to 30 minutes of running without stopping — about 5 km at 6
+        minutes per km. The app counts time, not distance or speed.
+      </Body>
+      <Body>
         Put your phone in your pocket, play your own music or podcast, and the
         app tells you when to run and when to walk — even with the screen off.
-        Prefer walking? A 16-stage race-walking program is one tap away on the
-        stage map.
+        Prefer walking? A 16-stage race-walking program builds to 40 minutes,
+        about 5 km at 8 minutes per km. It is one tap away on the stage map.
       </Body>
       <Body>
         After each session you rate how hard it felt. If it was near your limit

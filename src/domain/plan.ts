@@ -28,6 +28,15 @@ export interface Plan {
 }
 
 export const SESSIONS_PER_STAGE = 3;
+
+// Every goal stands for a 5 km run or race walk (docs/logic/product.md). The
+// app counts time only; the pace is what the goal time implies, not a target.
+export const GOAL_KM = 5;
+
+export function goalMinutesPerKm(plan: Plan): number {
+  return plan.goalSeconds / 60 / GOAL_KM;
+}
+
 const BOOKEND_SECONDS = 5 * 60;
 
 // Main blocks in minutes, alternating active and walk, starting with active.
@@ -99,7 +108,7 @@ export const RUNNING_PLAN: Plan = {
     },
     {
       number: 9,
-      tip: 'The goal: 30 minutes of continuous running.',
+      tip: 'The goal: 30 minutes of continuous running, about 5 km at 6 minutes per km.',
       sessions: sameThrice([30]),
     },
   ],
@@ -189,7 +198,7 @@ export const RACE_WALKING_PLAN: Plan = {
     },
     {
       number: 16,
-      tip: 'The goal: 40 minutes of continuous race walking.',
+      tip: 'The goal: 40 minutes of continuous race walking, about 5 km at 8 minutes per km.',
       sessions: sameThrice([40]),
     },
   ],

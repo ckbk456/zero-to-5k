@@ -1,6 +1,6 @@
 # Race-walking preset plan
 
-Date: 2026-10-18. Status: **draft curriculum, implemented as `race-walking-v1`** at the product owner's request on 2026-10-18. It has not been reviewed by a coach or clinician. Each week is one stage; the stage and check-in rules are the same as running ([MVP spec](mvp-spec.md) §3).
+Date: 2026-10-18. Status: **draft curriculum, implemented as `race-walking-v1`** at the product owner's request on 2026-10-18. It has not been reviewed by a coach or clinician. Each week is one stage; the stage and check-in rules are the same as running ([MVP spec](mvp-spec.md) §3). The 40-minute goal stands for a 5 km race walk at about 8:00/km ([product contract](../logic/product.md)); the app counts time only.
 
 ## Source
 

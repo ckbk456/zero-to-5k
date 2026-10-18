@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { ACTIVITY_COPY } from './activity';
 import {
   PLANS,
   RACE_WALKING_PLAN,
   RUNNING_PLAN,
   SESSIONS_PER_STAGE,
   getSession,
+  goalMinutesPerKm,
   planByVersion,
   totalSeconds,
   type Session,
@@ -172,4 +174,20 @@ test('each activity has its own plan, found by version', () => {
     assert.equal(planByVersion(plan.version), plan);
   }
   assert.equal(planByVersion('running-v0'), null);
+});
+
+test('each goal time stands for 5 km, and the copy says so', () => {
+  assert.equal(goalMinutesPerKm(RUNNING_PLAN), 6);
+  assert.equal(goalMinutesPerKm(RACE_WALKING_PLAN), 8);
+  for (const plan of Object.values(PLANS)) {
+    const equivalent = `${plan.goalSeconds / 60} minutes`;
+    const pace = `about 5 km at ${goalMinutesPerKm(plan)} minutes per km`;
+    for (const text of [
+      ACTIVITY_COPY[plan.activity].intro,
+      plan.stages.at(-1)!.tip,
+    ]) {
+      assert.ok(text.includes(equivalent), text);
+      assert.ok(text.includes(pace), text);
+    }
+  }
 });
