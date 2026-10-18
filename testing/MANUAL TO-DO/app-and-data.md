@@ -2,7 +2,7 @@
 
 Record device/build/date/steps/actual result for every performed check. Emulator evidence is separate from physical device acceptance. Never clear existing user data to simplify a test.
 
-1. Fresh install: Zero to 5K welcome describes twelve stages and 40 minutes, with conditional 5K pace reference. Complete onboarding once; relaunch bypasses it.
+1. Fresh install: compact welcome describes twelve stages and 40 minutes, with conditional 5K pace reference and iOS screen-off support. Start is visible at normal phone/text size; large text scrolls without clipping. Optional Learn opens the basics and returns without completing onboarding. Complete onboarding once; relaunch bypasses it.
 2. Home: twelve stage stops in two rows of six. All can be selected; suggested stage opens by default. Each has three expandable sessions, race-walking minutes and overall duration. Stage1 is 8 × 1 minute with 90-second breaks (28:30 overall); stage12 session1 is 51:30 overall, session3 is 50:00 overall with 40 continuous minutes.
 3. Preview: Start is above the full interval list. Choosing ahead within stage5 or later warns about order. Mark as done confirms, persists, contributes to progress, and records no measured time. No reward infers distance or continuous ability from manual completion.
 4. Native session: Start, pause, resume, end with confirmation; early endings appear in History and do not complete a session. Full sessions lead to an effort0–10/pain check-in.

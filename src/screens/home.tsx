@@ -481,6 +481,17 @@ function StagePanel({
         {definition.tip}
       </Text>
 
+      <Button
+        kind="lane"
+        label={`Preview session ${target + 1}`}
+        accessibilityHint={
+          suggested && target === focus
+            ? 'This is the next session in your plan'
+            : undefined
+        }
+        onPress={() => openSession(number, target)}
+      />
+
       <View>
         {definition.sessions.map((session, index) => {
           const done = stage.done[index];
@@ -579,17 +590,6 @@ function StagePanel({
           );
         })}
       </View>
-
-      <Button
-        kind="lane"
-        label={`Preview session ${target + 1}`}
-        accessibilityHint={
-          suggested && target === focus
-            ? 'This is the next session in your plan'
-            : undefined
-        }
-        onPress={() => openSession(number, target)}
-      />
     </View>
   );
 }
