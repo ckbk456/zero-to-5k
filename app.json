@@ -2,7 +2,7 @@
   "expo": {
     "name": "Zero to 5K",
     "slug": "zero-to-5k",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "scheme": "zeroto5k",
     "platforms": ["ios", "android"],
     "icon": "./assets/images/icon.png",
@@ -23,10 +23,12 @@
       "entitlements": {
         "com.apple.developer.healthkit": true,
         "com.apple.developer.healthkit.access": []
-      }
+      },
+      "buildNumber": "2"
     },
     "android": {
-      "package": "com.khangcao.buildto30"
+      "package": "com.khangcao.buildto30",
+      "versionCode": 2
     },
     "orientation": "portrait"
   }

@@ -1,5 +1,4 @@
-// Bundled training plans, one per activity. Sources: docs/design/running-preset-plan.md
-// and docs/design/race-walking-preset-plan.md.
+// Current plans and immutable prior versions. Sources: docs/design/*-plan.md.
 
 import type { Activity } from './activity';
 
@@ -12,6 +11,7 @@ export interface Interval {
 
 export interface Session {
   intervals: readonly Interval[];
+  title?: string;
 }
 
 export interface Stage {
@@ -116,7 +116,7 @@ export const RUNNING_PLAN: Plan = {
 
 // Draft curriculum pending coach review: every race walk is relaxed technique
 // practice, with 90-second ordinary walks between bouts until stage 13.
-export const RACE_WALKING_PLAN: Plan = {
+export const RACE_WALKING_PLAN_V1: Plan = {
   activity: 'race-walking',
   version: 'race-walking-v1',
   goalSeconds: 40 * 60,
@@ -204,13 +204,132 @@ export const RACE_WALKING_PLAN: Plan = {
   ],
 };
 
+// The owner-selected 12-stage curriculum. The dose is an original proposal,
+// pending coach review; the stage count is not a deadline or safety guarantee.
+function raceWalkingSession(bouts: readonly number[], title?: string): Session {
+  const main = bouts.flatMap((minutes, index) =>
+    index === 0 ? [minutes] : [1.5, minutes],
+  );
+  return { ...session(...main), ...(title ? { title } : {}) };
+}
+
+function raceWalkingPractice(minutes: number, count: number): Session[] {
+  return Array.from({ length: SESSIONS_PER_STAGE }, () =>
+    raceWalkingSession(Array<number>(count).fill(minutes)),
+  );
+}
+
+function raceWalkingBridge(
+  build: readonly number[],
+  bridge: readonly number[],
+  long: readonly number[],
+): Session[] {
+  return [
+    raceWalkingSession(build, 'Build time'),
+    raceWalkingSession(bridge, 'Build continuity'),
+    raceWalkingSession(long, 'Longer stretch'),
+  ];
+}
+
+export const RACE_WALKING_PLAN: Plan = {
+  activity: 'race-walking',
+  version: 'race-walking-v2',
+  goalSeconds: 40 * 60,
+  stages: [
+    {
+      number: 1,
+      tip: 'Eight 1-minute race walks with easy walks between them. Keep the effort comfortable; repeat this stage whenever you want.',
+      sessions: raceWalkingPractice(1, 8),
+    },
+    {
+      number: 2,
+      tip: 'Seven 90-second race walks. Keep your shoulders relaxed and leave time to recover between sessions.',
+      sessions: raceWalkingPractice(1.5, 7),
+    },
+    {
+      number: 3,
+      tip: 'Five 2½-minute race walks. Slow down or take an extra walking break when you need one.',
+      sessions: raceWalkingPractice(2.5, 5),
+    },
+    {
+      number: 4,
+      tip: 'Four 4-minute race walks. Comfortable practice matters more than speed.',
+      sessions: raceWalkingPractice(4, 4),
+    },
+    {
+      number: 5,
+      tip: 'The three sessions now differ. Follow their order to build time first, then try a longer stretch; nothing is locked.',
+      sessions: raceWalkingBridge(
+        [4, 4, 4, 4, 4],
+        [6, 4.5, 4.5, 4.5],
+        [8.5, 5, 5],
+      ),
+    },
+    {
+      number: 6,
+      tip: 'Fewer, longer race walks. There is no pace target; keep the effort manageable.',
+      sessions: raceWalkingBridge([7.5, 7.5, 7.5], [11, 11], [13, 9]),
+    },
+    {
+      number: 7,
+      tip: 'Each session has 25 minutes of race walking. The first stretch grows while the second gets shorter.',
+      sessions: raceWalkingBridge([12.5, 12.5], [15, 10], [17.5, 7.5]),
+    },
+    {
+      number: 8,
+      tip: '28 minutes of race walking with a short break. Repeating a session is part of practice, not a setback.',
+      sessions: raceWalkingBridge([14, 14], [20, 8], [22, 6]),
+    },
+    {
+      number: 9,
+      tip: '31 minutes of race walking. Keep the opening minutes comfortable so you have room for the longer stretch.',
+      sessions: raceWalkingBridge([15.5, 15.5], [24, 7], [26.5, 4.5]),
+    },
+    {
+      number: 10,
+      tip: '34 minutes of race walking. Take the walking break; a break does not undo your progress.',
+      sessions: raceWalkingBridge([17, 17], [29, 5], [31, 3]),
+    },
+    {
+      number: 11,
+      tip: 'The last session tries 35½ minutes without a planned break. You can still pause or walk whenever you need to.',
+      sessions: raceWalkingBridge([18.5, 18.5], [33, 4], [35.5]),
+    },
+    {
+      number: 12,
+      tip: 'The goal: 40 minutes of continuous race walking, about 5 km at 8 minutes per km. Completing the time counts at your own pace.',
+      sessions: raceWalkingBridge([20, 20], [38], [40]),
+    },
+  ],
+};
+
 export const PLANS: Record<Activity, Plan> = {
   running: RUNNING_PLAN,
   'race-walking': RACE_WALKING_PLAN,
 };
 
+// Keep every released version resolvable for history and a live attempt.
+// A new version never reuses or converts completion rows from another version.
+export const PLAN_CATALOG: readonly { plan: Plan; label: string }[] = [
+  { plan: RACE_WALKING_PLAN, label: 'Race walking · 12 stages' },
+  { plan: RACE_WALKING_PLAN_V1, label: 'Race walking · previous 16 stages' },
+  { plan: RUNNING_PLAN, label: 'Running · 9 stages' },
+];
+
 export function planByVersion(version: string): Plan | null {
-  return Object.values(PLANS).find((plan) => plan.version === version) ?? null;
+  return (
+    PLAN_CATALOG.find(({ plan }) => plan.version === version)?.plan ?? null
+  );
+}
+
+// Target-activity time only; warm-up, recovery, and cool-down are excluded.
+// This does not measure effort or establish vigorous-activity minutes.
+export function activeSeconds(session: Session): number {
+  return session.intervals.reduce(
+    (sum, interval) =>
+      sum + (interval.kind === 'active' ? interval.seconds : 0),
+    0,
+  );
 }
 
 export function totalSeconds(session: Session): number {

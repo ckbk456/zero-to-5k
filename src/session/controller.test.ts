@@ -4,7 +4,11 @@ import { test } from 'node:test';
 import type { RuntimeState, StartConfig } from '@modules/session-runtime';
 
 import { RACE_WALKING_PLAN, RUNNING_PLAN } from '../domain/plan';
-import { listAttempts, migrateDatabase } from '../storage/database';
+import {
+  listAttempts,
+  migrateDatabase,
+  type SqlConnection,
+} from '../storage/database';
 import { connect } from '../storage/test-sqlite';
 import { settle, startSession, type Runtime } from './controller';
 
@@ -90,20 +94,184 @@ test('a race-walking session is recorded under its own plan', async () => {
       db,
       runtime,
       RACE_WALKING_PLAN,
-      { ...request, stage: 16 },
+      { ...request, stage: RACE_WALKING_PLAN.stages.length, sessionIndex: 2 },
       settings,
       clock,
     );
     const [config] = runtime.started;
-    assert.equal(config?.title, 'Stage 16 · Session 1');
+    assert.equal(
+      config?.title,
+      `Stage ${RACE_WALKING_PLAN.stages.length} · Session 3`,
+    );
     assert.deepEqual(
       config?.cues.map((cue) => cue.text),
       ['Walk', 'Race walk', 'Walk', 'Done'],
     );
     assert.deepEqual(await listAttempts(db, 'running-v1'), []);
-    const [row] = await listAttempts(db, 'race-walking-v1');
+    const [row] = await listAttempts(db, RACE_WALKING_PLAN.version);
     assert.equal(row?.id, id);
-    assert.equal(row?.stage, 16);
+    assert.equal(row?.stage, RACE_WALKING_PLAN.stages.length);
+  } finally {
+    sqlite.close();
+  }
+});
+
+test('a failed completion write preserves native result for a successful retry', async () => {
+  const { db, sqlite, runtime } = await setup();
+  try {
+    const id = await startSession(
+      db,
+      runtime,
+      RUNNING_PLAN,
+      request,
+      settings,
+      clock,
+    );
+    runtime.state = {
+      ...runtime.state,
+      status: 'finished',
+      elapsedMs: 1_710_000,
+    };
+    let failOnce = true;
+    const flaky: SqlConnection = {
+      ...db,
+      runAsync: async (sql, ...params) => {
+        if (failOnce && sql.includes('SET status = ?, ended_at')) {
+          failOnce = false;
+          throw new Error('Storage temporarily unavailable');
+        }
+        return db.runAsync(sql, ...params);
+      },
+    };
+    await assert.rejects(
+      settle(flaky, runtime, clock),
+      /Storage temporarily unavailable/,
+    );
+    assert.equal(runtime.state.status, 'finished');
+    assert.equal(
+      (await listAttempts(db, RUNNING_PLAN.version))[0]?.status,
+      'in_progress',
+    );
+    assert.deepEqual(await settle(flaky, runtime, clock), {
+      kind: 'completed',
+      attemptId: id,
+    });
+    assert.equal(runtime.state.status, 'idle');
+    assert.equal(
+      (await listAttempts(db, RUNNING_PLAN.version))[0]?.status,
+      'completed',
+    );
+  } finally {
+    sqlite.close();
+  }
+});
+
+test('a native reset failure can retry an already persisted completion', async () => {
+  const { db, sqlite, runtime } = await setup();
+  try {
+    const id = await startSession(
+      db,
+      runtime,
+      RUNNING_PLAN,
+      request,
+      settings,
+      clock,
+    );
+    runtime.state = {
+      ...runtime.state,
+      status: 'finished',
+      elapsedMs: 1_710_000,
+    };
+    const reset = runtime.reset.bind(runtime);
+    runtime.reset = async () => {
+      throw new Error('Native reset failed');
+    };
+    await assert.rejects(settle(db, runtime, clock), /Native reset failed/);
+    assert.equal(
+      (await listAttempts(db, RUNNING_PLAN.version))[0]?.status,
+      'completed',
+    );
+    runtime.reset = reset;
+    assert.deepEqual(await settle(db, runtime, clock), {
+      kind: 'completed',
+      attemptId: id,
+    });
+    assert.equal(runtime.state.status, 'idle');
+  } finally {
+    sqlite.close();
+  }
+});
+
+test('concurrent start requests create only one attempt', async () => {
+  const { db, sqlite, runtime } = await setup();
+  try {
+    const results = await Promise.allSettled([
+      startSession(db, runtime, RUNNING_PLAN, request, settings, clock),
+      startSession(db, runtime, RUNNING_PLAN, request, settings, clock),
+    ]);
+    assert.equal(results[0]?.status, 'fulfilled');
+    assert.equal(results[1]?.status, 'rejected');
+    assert.equal(runtime.started.length, 1);
+    assert.equal((await listAttempts(db, RUNNING_PLAN.version)).length, 1);
+  } finally {
+    sqlite.close();
+  }
+});
+
+test('reconciliation waits for a native start before interrupting stale attempts', async () => {
+  const { db, sqlite, runtime } = await setup();
+  try {
+    let enter!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const nativeStart = runtime.start.bind(runtime);
+    runtime.start = async (config) => {
+      enter();
+      await gate;
+      return nativeStart(config);
+    };
+    const start = startSession(
+      db,
+      runtime,
+      RUNNING_PLAN,
+      request,
+      settings,
+      clock,
+    );
+    await entered;
+    const reconciliation = settle(db, runtime, clock);
+    release();
+    const id = await start;
+    assert.deepEqual(await reconciliation, { kind: 'live', attemptId: id });
+    assert.equal(
+      (await listAttempts(db, RUNNING_PLAN.version))[0]?.status,
+      'in_progress',
+    );
+  } finally {
+    sqlite.close();
+  }
+});
+
+test('reconciliation leaves a running cue rehearsal to its owning screen', async () => {
+  const { db, sqlite, runtime } = await setup();
+  try {
+    runtime.state = {
+      ...runtime.state,
+      status: 'running',
+      sessionKey: 'cue-check',
+    };
+    assert.deepEqual(await settle(db, runtime, clock), { kind: 'none' });
+    assert.equal(runtime.state.status, 'running');
+    await assert.rejects(
+      startSession(db, runtime, RUNNING_PLAN, request, settings, clock),
+      /already running/,
+    );
+    assert.equal((await listAttempts(db, RUNNING_PLAN.version)).length, 0);
   } finally {
     sqlite.close();
   }

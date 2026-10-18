@@ -10,6 +10,7 @@ import {
 import { intervalLabel } from '@/domain/cues';
 import {
   SESSIONS_PER_STAGE,
+  activeSeconds,
   goalMinutesPerKm,
   totalSeconds,
   type Plan,
@@ -56,6 +57,8 @@ export function HomeScreen() {
   const [picked, setPicked] = useState<number | null>(null);
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState<string | null>(null);
+  const [settleError, setSettleError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   // Reattach to a live session or record one that ended while away.
   useEffect(() => {
@@ -68,16 +71,27 @@ export function HomeScreen() {
             pathname: '/session/live',
             params: { attempt: String(result.attemptId) },
           });
+        } else if (result.kind === 'completed') {
+          router.push({
+            pathname: '/session/check',
+            params: { attempt: String(result.attemptId) },
+          });
         }
         // A session that finished while away surfaces as a pending check-in.
         return reload();
       })
-      .catch(() => {})
+      .catch(
+        () =>
+          active &&
+          setSettleError(
+            'Your last session could not be recovered. Please try again before starting another.',
+          ),
+      )
       .finally(() => active && setSettled(true));
     return () => {
       active = false;
     };
-  }, [db, reload]);
+  }, [db, reload, retry]);
 
   if (error) {
     return (
@@ -88,6 +102,20 @@ export function HomeScreen() {
     );
   }
   if (!data || !settled) return <Loading label="Loading your progress" />;
+  if (settleError)
+    return (
+      <Screen edgeToEdge>
+        <ErrorText>{settleError}</ErrorText>
+        <Button
+          label="Try again"
+          onPress={() => {
+            setSettleError(null);
+            setSettled(false);
+            setRetry((value) => value + 1);
+          }}
+        />
+      </Screen>
+    );
   if (!data.settings.onboarded) return <Redirect href="/welcome" />;
 
   const { plan, progress } = data;
@@ -116,7 +144,11 @@ export function HomeScreen() {
       <View style={{ gap: 6 }}>
         <Title>Zero to 5K</Title>
         <Body muted>
-          {copy.intro} Start with stage 1 or tap any stage below.
+          Race walking, one session at a time. Build toward 40 continuous
+          minutes at your own pace.
+        </Body>
+        <Body muted>
+          3 sessions a week · Rest a day between · Repeat any stage
         </Body>
       </View>
 
@@ -140,9 +172,7 @@ export function HomeScreen() {
       {progress.pending && (
         <Card>
           <Heading>How did your last session go?</Heading>
-          <Body muted>
-            Rate it so the app can tell whether this stage is in control.
-          </Body>
+          <Body muted>A quick check-in helps you decide what to do next.</Body>
           <Button
             label="Check in"
             onPress={() =>
@@ -157,14 +187,12 @@ export function HomeScreen() {
 
       {progress.goalReached && (
         <Card>
-          <Heading>
-            You can {copy.verb} for {goalMinutes} minutes
-          </Heading>
+          <Heading>Your {goalMinutes}-minute stage is complete</Heading>
           <Body muted>
-            A 5K is within reach: {goalMinutes} minutes is about 5 km at{' '}
-            {goalMinutesPerKm(plan)} minutes per km. Keep it up with any
-            session, three times a week. Every {copy.active.toLowerCase()} is
-            saved in your history.
+            You recorded the final stage. {goalMinutes} minutes covers 5 km at{' '}
+            {goalMinutesPerKm(plan)} minutes per km; your distance may differ.
+            Keep it up with any session, three times a week. Every{' '}
+            {copy.active.toLowerCase()} is saved in your history.
           </Body>
         </Card>
       )}
@@ -178,13 +206,17 @@ export function HomeScreen() {
       />
 
       <View>
+        <Row
+          label="Race-walking basics"
+          onPress={() => router.push('/learn')}
+        />
         <Row label="History" onPress={() => router.push('/history')} />
         <Row label="Settings" onPress={() => router.push('/settings')} last />
       </View>
 
       <Body muted>
-        Cleared means every session felt manageable (effort 8 or lower) with no
-        pain. Completed means every session is done.
+        Twelve stages, usually twelve weeks. There is no deadline and no pace to
+        chase. Your time counts.
       </Body>
     </Screen>
   );
@@ -248,8 +280,8 @@ function ActivitySwitch({
   );
 }
 
-// Up to nine stops per line; 16 race-walking stages make two lines of 8.
-const MAX_STOPS_PER_LINE = 9;
+// Six stops keep touch targets comfortable on narrow phones.
+const MAX_STOPS_PER_LINE = 6;
 
 // A stepper: numbered stops joined by a line, so it reads as a sequence.
 // Finished stages are filled and the line between them fills in; the picked
@@ -307,7 +339,7 @@ function StagePicker({
                   onPress={() => onSelect(number)}
                   style={({ pressed }) => ({
                     width: `${100 / perLine}%`,
-                    height: 40,
+                    height: 48,
                     alignItems: 'center',
                     justifyContent: 'center',
                     opacity: pressed ? 0.6 : 1,
@@ -365,7 +397,7 @@ function Connector({ left, filled }: { left?: boolean; filled: boolean }) {
     <View
       style={{
         position: 'absolute',
-        top: 19,
+        top: 23,
         height: 2,
         left: left ? 0 : '50%',
         right: left ? '50%' : 0,
@@ -417,12 +449,14 @@ function StagePanel({
         }}
       >
         <View accessible accessibilityRole="header">
-          <Text style={{ color: colors.onLaneMuted, fontSize: 17 }}>Stage</Text>
+          <Text style={{ color: colors.onLaneMuted, fontSize: 17 }}>
+            {suggested ? 'Your next stage' : 'Stage'}
+          </Text>
           <Text
             style={{
               color: colors.onLane,
-              fontSize: 76,
-              lineHeight: 80,
+              fontSize: 56,
+              lineHeight: 64,
               fontWeight: '900',
               letterSpacing: -3,
               fontVariant: ['tabular-nums'],
@@ -505,6 +539,7 @@ function StagePanel({
                   }}
                 >
                   Session {index + 1}
+                  {session.title ? `\n${session.title}` : ''}
                 </Text>
                 <Text
                   style={{
@@ -527,6 +562,10 @@ function StagePanel({
               </Pressable>
               {expanded && (
                 <View style={{ gap: 12, paddingBottom: 16 }}>
+                  <Text style={{ color: colors.onLaneMuted, fontSize: 15 }}>
+                    {formatMinutes(activeSeconds(session))} race walking ·{' '}
+                    {formatMinutes(totalSeconds(session))} overall
+                  </Text>
                   <IntervalBar
                     tone="lane"
                     showTotal={false}

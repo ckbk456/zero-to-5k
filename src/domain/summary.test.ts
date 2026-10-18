@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  PLANS,
+  PLAN_CATALOG,
   RACE_WALKING_PLAN,
+  RACE_WALKING_PLAN_V1,
   RUNNING_PLAN,
   getSession,
   totalSeconds,
@@ -32,6 +33,12 @@ test('different pairs stay separate and a lone run stays single', () => {
 test('race-walking bouts collapse the same way', () => {
   assert.deepEqual(summarizeSession(getSession(RACE_WALKING_PLAN, 1, 0)), [
     { kind: 'single', interval: { kind: 'warmup', seconds: 300 } },
+    { kind: 'cycle', active: 60, walk: 90, times: 7 },
+    { kind: 'single', interval: { kind: 'active', seconds: 60 } },
+    { kind: 'single', interval: { kind: 'cooldown', seconds: 300 } },
+  ]);
+  assert.deepEqual(summarizeSession(getSession(RACE_WALKING_PLAN_V1, 1, 0)), [
+    { kind: 'single', interval: { kind: 'warmup', seconds: 300 } },
     { kind: 'cycle', active: 30, walk: 90, times: 5 },
     { kind: 'single', interval: { kind: 'active', seconds: 30 } },
     { kind: 'single', interval: { kind: 'cooldown', seconds: 300 } },
@@ -39,7 +46,7 @@ test('race-walking bouts collapse the same way', () => {
 });
 
 test('every summary accounts for the whole session', () => {
-  for (const plan of Object.values(PLANS)) {
+  for (const { plan } of PLAN_CATALOG) {
     for (const stage of plan.stages) {
       for (const session of stage.sessions) {
         const seconds = summarizeSession(session).reduce(

@@ -32,12 +32,12 @@ export function WelcomeScreen() {
 
   return (
     <Screen>
-      <Title>From zero to 5K</Title>
+      <Title>Your first race-walking 5K</Title>
       <Body>
-        Zero to 5K is a game of 16 race-walking stages. Each stage has 3
-        sessions of race walking and easy walking, building to 40 minutes of
-        race walking without stopping — about 5 km at 8 minutes per km. The app
-        counts time, not distance or speed.
+        Start small and build a habit over 12 stages. Each stage has 3 sessions
+        of race walking and easy walking, building to 40 minutes of race walking
+        without stopping — about 5 km at 8 minutes per km. The app counts time,
+        not distance or speed.
       </Body>
       <Body>
         Put your phone in your pocket, play your own music or podcast, and the
@@ -46,9 +46,11 @@ export function WelcomeScreen() {
         app times your practice; it cannot judge your technique.
       </Body>
       <Body>
-        After each session you rate how hard it felt. If it was near your limit
-        or something hurt, we will suggest repeating the stage. It is always
-        your call.
+        Aim for three sessions a week with a rest day between. Repeat a stage
+        whenever you need; twelve weeks is a guide, not a deadline. After each
+        session you rate how hard it felt. If it was near your limit or
+        something hurt, we will suggest repeating the stage. It is always your
+        call.
       </Body>
 
       <Card>

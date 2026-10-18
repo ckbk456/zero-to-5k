@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { router } from 'expo-router';
+import Constants from 'expo-constants';
 import { Switch, Text, TextInput, View } from 'react-native';
 
 import { ACTIVITY_COPY, OFFERED_ACTIVITIES } from '@/domain/activity';
@@ -16,6 +18,7 @@ import {
   ErrorText,
   Heading,
   Loading,
+  Row,
   Screen,
 } from '@/ui/kit';
 
@@ -23,10 +26,17 @@ const CONFIRM_WORD = 'RESET';
 
 export function SettingsScreen() {
   const colors = useColors();
-  const { db, data, reload } = useProgram();
+  const { db, data, reload, error: loadError } = useProgram();
   const [confirm, setConfirm] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  if (loadError)
+    return (
+      <Screen>
+        <ErrorText>{loadError}</ErrorText>
+        <Button label="Try again" onPress={() => void reload()} />
+      </Screen>
+    );
   if (!data) return <Loading label="Loading settings" />;
   const { plan } = data;
   const copy = ACTIVITY_COPY[plan.activity];
@@ -76,7 +86,16 @@ export function SettingsScreen() {
               minHeight: 44,
             }}
           >
-            <Text style={{ color: colors.text, fontSize: 17 }}>{label}</Text>
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: 17,
+                flex: 1,
+                paddingRight: 12,
+              }}
+            >
+              {label}
+            </Text>
             <Switch
               accessibilityLabel={label}
               value={data.settings[key]}
@@ -85,12 +104,18 @@ export function SettingsScreen() {
           </View>
         ))}
         <Body muted>Changes apply from your next session.</Body>
+        <Row
+          label="Try the cues · 30 seconds"
+          onPress={() => router.push('/cue-check')}
+          last
+        />
       </Card>
 
       <Card>
         <Heading>Reset {program} progress</Heading>
         <Body muted>
-          Deletes your {program} history and returns you to stage 1.
+          Deletes this 12-stage plan’s history and returns you to stage 1. Older
+          plan history is kept.
           {OFFERED_ACTIVITIES.length > 1 &&
             ' The other program keeps its progress.'}{' '}
           Type {CONFIRM_WORD} to confirm.
@@ -127,7 +152,7 @@ export function SettingsScreen() {
         <Heading>About and safety</Heading>
         <Body>
           Zero to 5K takes generally healthy adults from walking to a 5K race
-          walk in 16 stages: 40 minutes of continuous race walking, about 5 km
+          walk in 12 stages: 40 minutes of continuous race walking, about 5 km
           at 8 minutes per km. The app counts time, not distance or speed; at a
           slower pace, 5 km takes a little longer. It is not medical advice or a
           rehabilitation program.
@@ -140,9 +165,14 @@ export function SettingsScreen() {
         <Body>
           Stop and rest if you feel chest pain, faintness, or severe
           breathlessness, and check with a doctor if you have a health concern.
-          Your data stays on this phone.
+          Your session history is stored on this device. There is no account,
+          advertising, location tracking or cloud sync. System backups may
+          include app data.
         </Body>
       </Card>
+      <Body muted>
+        Version {Constants.expoConfig?.version ?? '0.1.0'} · Offline first
+      </Body>
     </Screen>
   );
 }

@@ -25,14 +25,14 @@ Open owner decisions: whether to position the app for people with joint problems
 
 The MVP experience below is implemented: welcome and safety screen, stage map, session preview, live session driven by the native runtime, post-session check-in with advisory restart, stage results, history, and settings. Device validation of screen-off cues is pending (see the [workout runtime guide](../../testing/MANUAL%20TO-DO/workout-runtime.md)).
 
-On 2026-10-18 the product owner called the running section a pass (owner review, not the device QA gate). Race walking was added the same day, briefly behind a Running / Race walking switch, and then became the only program shown. It has 16 stages from the [draft race-walking preset](../design/race-walking-preset-plan.md), which still needs coach review. Each program has its own stages, progress, history, and reset; the check-in and stage rules are shared.
+On 2026-10-18 the product owner called the running section a pass (owner review, not the device QA gate). Race walking was added the same day, briefly behind a Running / Race walking switch, and then became the only program shown. It now has 12 stages from the [owner-selected progression](../design/race-walking-12-week-plan.md) (2026-10-19), which still needs coach review. Each program has its own stages, progress, history, and reset; the check-in and stage rules are shared.
 
 ## MVP experience
 
 The MVP was specified and built for running; since 2026-10-18 the same experience runs the race-walking program.
 
 - A session plays timed cues ("Race walk" / "Walk") with the screen off (phone in a pocket or pouch), alongside the user's music or podcasts. A screen-on-only timer does not meet the MVP.
-- The program is a game of 16 stages built from the [race-walking preset](../design/race-walking-preset-plan.md) (originally 9 stages from the [running preset](../design/running-preset-plan.md)). Nothing is locked: the user can preview, start, or mark done any session; the app suggests the next one. After each session the user rates effort (0–10) and reports pain. A rating of 9–10 or pain makes the app recommend retrying the stage; it never blocks advancing. See [MVP spec](../design/mvp-spec.md).
+- The program is a sequence of 12 stages built from the [race-walking progression](../design/race-walking-12-week-plan.md) (originally 9 stages from the [running preset](../design/running-preset-plan.md)). Nothing is locked: the user can preview, start, or mark done any session; the app suggests the next one. After each session the user rates effort (0–10) and reports pain. A rating of 9–10 or pain makes the app recommend retrying the stage; it never blocks advancing. See [MVP spec](../design/mvp-spec.md).
 - Individual sessions preview their intervals. Retrying a stage is not failure.
 - The app works without an account.
 
@@ -49,3 +49,11 @@ Not planned in detail; listed so MVP decisions do not block them. Priorities and
 - AI-assisted (Claude) program generation backed by a curated knowledge base. Generated doses must still pass the deterministic limits.
 - Strava, Apple Health, and Android Health Connect integration.
 - Distance, GPS, and performance goals. GPS cannot certify legal race-walking technique. Never require a pace to earn completion of a time-based session.
+
+## Delivery direction accepted 2026-10-19
+
+The owner authorized the attached 12-stage curriculum, beginner guidance, scoped implementation/publication/merges and emulator testing. Preserve the generally healthy adult audience and time-only completion. The older 16-stage draft and running plan remain available in historical records without transferring their completions to the new doses.
+
+Keep the experience small: a suggested session, expandable plan, cues over personal audio, quick check-in, milestones and history. A 30-second cue rehearsal creates no training credit. Beginner guidance and a rest-day rhythm are included; coach review is still a release gate, not something arithmetic or emulator tests can replace.
+
+The [12-stage 5K–10K extension](../design/race-walking-5k-to-10k.md) is researched as a proposal only. Its goal would be 80 continuous minutes, with distance dependent on pace. The core app stays offline without an API key; release credentials concern builds/signing/stores, not a training backend.

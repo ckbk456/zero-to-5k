@@ -45,6 +45,6 @@ export const ACTIVITY_COPY: Record<Activity, ActivityCopy> = {
     verb: 'race walk',
     past: 'race walked',
     intro:
-      'Sixteen stages to a 5K: 40 minutes of race walking without stopping, about 5 km at 8 minutes per km. The app times your practice; it cannot judge your technique.',
+      'Twelve stages to a 5K: 40 minutes of race walking without stopping, about 5 km at 8 minutes per km. The app times your practice; it cannot judge your technique.',
   },
 };

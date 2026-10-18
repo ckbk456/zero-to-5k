@@ -15,8 +15,8 @@
 - [Program generator research](research/program-generator-research.md)
 - [Program generator](design/program-generator-proposal.md)
 - [Running preset plan](design/running-preset-plan.md) — implemented, not offered since 2026-10-18
-- [Race-walking preset plan](design/race-walking-preset-plan.md) — the app's program; draft, coach review pending
-- [MVP spec and scope](design/mvp-spec.md) — draft for owner review
+- [Race-walking preset plan](design/race-walking-preset-plan.md) — retained 16-stage historical draft
+- [MVP spec and scope](design/mvp-spec.md) — implemented delivery scope
 
 Proposals are not implemented contracts. Research includes optional distance goals; primary completion is time-based. Public documents exclude personal health context and original screenshots. Superseded material belongs in `docs/archive/` when needed, not an empty ceremonial folder.
 
@@ -24,3 +24,6 @@ Proposals are not implemented contracts. Research includes optional distance goa
 
 - [Bootstrap record](bootstrap.md)
 - [Dependency audit](research/dependency-audit.md)
+
+- [Current 12-stage curriculum](design/race-walking-12-week-plan.md)
+- [5K–10K second-stage proposal](design/race-walking-5k-to-10k.md)

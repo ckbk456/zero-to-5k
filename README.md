@@ -1,49 +1,41 @@
 # Zero to 5K
 
-A time-based race-walking app for iOS and Android that builds up to a 5 km race walk. It counts time, not distance or speed: 40 minutes of continuous race walking, about 5 km at 8:00/km. A 30-minute running program is built but not currently offered.
+A simple, offline race-walking companion for iOS and Android. Twelve stages, three sessions per stage, and cues over your music or podcasts build toward 40 continuous minutes. That covers 5 km at 8:00/km; completing your planned time counts regardless of pace or distance.
 
-## Current status
+## What works
 
-An early scaffold, not a workout coach yet:
+- Native Swift/Kotlin workout timer, chime/spoken cues, pause/resume/end and Android notification controls.
+- Session previews with race-walking and overall duration, suggested order and freely selectable stages.
+- Effort/pain check-ins, stage milestones, local history and preserved older plan records.
+- Beginner basics, a 30-second cue rehearsal, sound/vibration settings and light/dark appearance.
+- Local SQLite with append-only migrations. No account, backend, GPS, analytics or API key is needed.
 
-- Expo SDK 57, React Native, Expo Router, and strict TypeScript.
-- A native home screen with running/race-walking selection.
-- Local SQLite preferences and a transactional, versioned migration.
-- SQL migration/persistence tests, lint, formatting, type checking, and mobile JavaScript export checks.
+The curriculum is an original draft awaiting independent coach review. Emulator checks do not replace physical-device screen-off audio, headphones and battery validation. Store signing/review is a separate delivery step.
 
-Workouts, background cues, training history, and program generation are not implemented. The icon is an Expo template placeholder. Native device QA remains pending.
-
-## Start locally
+## Run locally
 
 Use Node **24.17.0** and npm **11.13.0**.
 
 ```sh
 nvm use
 npm ci
-npm start
+npm run ios       # select an iOS simulator
+npm run android   # Android emulator
 ```
 
-The app uses a local native module, so Expo Go is not supported. `npm run ios -- --device` and `npm run android` build and install a development build; see [commands](docs/commands.md). No backend, credentials, or Expo cloud project is needed.
-
-SDK 57 was selected because Expo's setup guidance on 2026-10-16 recommends it for physical-device Expo Go during the SDK 58 transition. Screen-off coaching runs in a native module and requires development builds and device validation.
+A local native module means Expo Go is unsupported. See the [command registry](docs/commands.md) for self-contained release-mode simulator builds and process ownership.
 
 ```sh
-npm run check          # One-shot formatting, lint, types, real SQLite tests
-npm run export:mobile  # iOS/Android JavaScript bundles, not signed apps
-npm run doctor        # Network-dependent Expo diagnostics
+npm run check
+npm run export:mobile
+npm run doctor
 ```
 
-See the [command registry](docs/commands.md) for environments and ownership.
+## Documentation and data
 
-## Data and documentation
+[Product](docs/logic/product.md), [architecture](docs/logic/architecture.md), [specification](docs/design/mvp-spec.md), [current curriculum](docs/design/race-walking-12-week-plan.md), [5K–10K proposal](docs/design/race-walking-5k-to-10k.md), and [manual checks](testing/MANUAL%20TO-DO/README.md).
 
-Only the activity preference is stored locally. There is no authentication, telemetry, location recording, or sync. SQLite is not application-level encrypted; review storage before adding sensitive data. Device databases and private notes are ignored by Git.
-
-- [Documentation](docs/README.md), [product](docs/logic/product.md), and [architecture](docs/logic/architecture.md)
-- [Roadmap](docs/roadmap.md) and [manual testing](testing/MANUAL%20TO-DO/README.md)
-- [Contributing](CONTRIBUTING.md) and [agent instructions](AGENTS.md)
-
-The integration branch is `main`; future implementation uses isolated `codex/<task>` branches/worktrees. Research cannot override the current product contract.
+Session history, effort/pain answers and settings are stored on the device. System backups may include app data; there is no app-level cloud sync or encryption. Device databases and credentials are ignored by Git. Historical running and 16-stage race-walking definitions remain in code for data compatibility.
 
 ## License
 

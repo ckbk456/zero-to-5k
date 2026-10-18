@@ -4,7 +4,7 @@ import { Alert, PermissionsAndroid, Platform, Text, View } from 'react-native';
 
 import { ACTIVITY_COPY, type Activity } from '@/domain/activity';
 import { describeDuration, intervalLabel } from '@/domain/cues';
-import { getSession } from '@/domain/plan';
+import { activeSeconds, getSession, totalSeconds } from '@/domain/plan';
 import { SessionRuntime } from '@modules/session-runtime';
 import { startSession } from '@/session/controller';
 import { useProgram } from '@/session/use-program';
@@ -19,6 +19,7 @@ import {
   Note,
   Screen,
   Title,
+  formatMinutes,
 } from '@/ui/kit';
 
 async function requestNotifications() {
@@ -34,10 +35,17 @@ export function PreviewScreen() {
   const params = useLocalSearchParams<{ stage: string; index: string }>();
   const stageNumber = Number(params.stage);
   const sessionIndex = Number(params.index);
-  const { db, data } = useProgram();
+  const { db, data, error: loadError, reload } = useProgram();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  if (loadError)
+    return (
+      <Screen>
+        <ErrorText>{loadError}</ErrorText>
+        <Button label="Try again" onPress={() => void reload()} />
+      </Screen>
+    );
   if (!data) return <Loading label="Loading session" />;
   const { plan } = data;
   const stage = plan.stages[stageNumber - 1];
@@ -54,7 +62,12 @@ export function PreviewScreen() {
   const progress = data.progress.stages[stageNumber - 1]!;
   const alreadyDone = progress.done[sessionIndex] === true;
   const suggestedStage = data.progress.next?.stage;
-  const ahead = suggestedStage !== undefined && stageNumber > suggestedStage;
+  const ahead =
+    data.progress.next !== null &&
+    data.progress.next !== undefined &&
+    (stageNumber > data.progress.next.stage ||
+      (stageNumber === data.progress.next.stage &&
+        sessionIndex > data.progress.next.sessionIndex));
 
   async function start() {
     setBusy(true);
@@ -120,6 +133,12 @@ export function PreviewScreen() {
           Stage {stageNumber}, session {sessionIndex + 1}
         </Title>
         <Body muted>{stage.tip}</Body>
+        {session.title && <Body>{session.title}</Body>}
+        <Body muted>
+          {formatMinutes(activeSeconds(session))} race walking ·{' '}
+          {formatMinutes(totalSeconds(session))} including warm-up, breaks and
+          cool-down
+        </Body>
       </View>
 
       <IntervalBar intervals={session.intervals} activity={plan.activity} />
@@ -127,13 +146,14 @@ export function PreviewScreen() {
 
       {ahead && (
         <Note>
-          This is ahead of your plan, which is at stage {suggestedStage}. Big
-          jumps are harder on your body; going back a stage is always fine.
+          Your next suggested session is stage {suggestedStage}, session{' '}
+          {(data.progress.next?.sessionIndex ?? 0) + 1}. The sessions build on
+          each other, especially from stage 5. You can still choose any session.
         </Note>
       )}
       {alreadyDone && (
         <Body muted>
-          You have done this session. {copy.name} it again is fine.
+          You have done this session. Repeating it is always fine.
         </Body>
       )}
 
@@ -153,11 +173,17 @@ export function PreviewScreen() {
       <Body muted>
         Start your music or podcast, then press Start. You will hear a chime and
         “{copy.active.toLowerCase()}” or “walk” at every change; the screen can
-        turn off.
+        turn off when background support is available.
         {Platform.OS === 'ios'
-          ? ' The first time, iOS asks to let Zero to 5K save workouts to Apple Health — this is what keeps cues playing with the screen locked.'
+          ? ' iOS asks for workout permission to support screen-off cues. If unavailable, the session screen will tell you to keep it on.'
           : ''}
       </Body>
+      <Button
+        kind="secondary"
+        label="Try the cues · 30 seconds"
+        disabled={busy}
+        onPress={() => router.push('/cue-check')}
+      />
 
       <View>
         {session.intervals.map((interval, index) => {
@@ -212,7 +238,7 @@ export function PreviewScreen() {
 function Legend({ activity }: { activity: Activity }) {
   const colors = useColors();
   return (
-    <View style={{ flexDirection: 'row', gap: 18 }}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 18 }}>
       {(
         [
           [ACTIVITY_COPY[activity].active, colors.accent],

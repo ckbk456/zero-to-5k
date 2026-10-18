@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { buildSchedule, describeDuration } from './cues';
 import {
   RACE_WALKING_PLAN,
+  RACE_WALKING_PLAN_V1,
   RUNNING_PLAN,
   getSession,
   totalSeconds,
@@ -64,8 +65,21 @@ test('race walking says "Race walk" and keeps "Walk" for recovery', () => {
   assert.deepEqual(cues.slice(0, 4), [
     { atMs: 0, text: 'Walk' },
     { atMs: 300_000, text: 'Race walk' },
-    { atMs: 330_000, text: 'Walk' },
-    { atMs: 420_000, text: 'Race walk' },
+    { atMs: 360_000, text: 'Walk' },
+    { atMs: 450_000, text: 'Race walk' },
+  ]);
+});
+
+test('the final v2 race walk changes to cooldown at 45 minutes and ends at 50', () => {
+  const { cues } = buildSchedule(
+    getSession(RACE_WALKING_PLAN, 12, 2),
+    'race-walking',
+  );
+  assert.deepEqual(cues, [
+    { atMs: 0, text: 'Walk' },
+    { atMs: 300_000, text: 'Race walk' },
+    { atMs: 2_700_000, text: 'Walk' },
+    { atMs: 3_000_000, text: 'Done' },
   ]);
 });
 
@@ -73,6 +87,7 @@ test('every plan session produces a valid, ordered schedule', () => {
   for (const [plan, active] of [
     [RUNNING_PLAN, 'Run'],
     [RACE_WALKING_PLAN, 'Race walk'],
+    [RACE_WALKING_PLAN_V1, 'Race walk'],
   ] as const) {
     for (const stage of plan.stages) {
       for (const session of stage.sessions) {

@@ -56,11 +56,24 @@ export function LiveScreen() {
 
   // The attempt names its own plan, whichever activity is selected.
   useEffect(() => {
-    void getAttempt(db, attemptId).then((row) => {
-      const plan = row && planByVersion(row.planVersion);
-      if (row && plan) setTarget({ ...row, plan });
-      else setError('This session could not be found.');
-    });
+    let active = true;
+    void getAttempt(db, attemptId)
+      .then((row) => {
+        if (!active) return;
+        const plan = row && planByVersion(row.planVersion);
+        if (row && plan) setTarget({ ...row, plan });
+        else setError('This session could not be found.');
+      })
+      .catch(
+        () =>
+          active &&
+          setError(
+            'This session could not be loaded. Return to stages to recover it.',
+          ),
+      );
+    return () => {
+      active = false;
+    };
   }, [db, attemptId]);
 
   // The runtime is the source of truth; poll it while visible and listen for
@@ -68,7 +81,12 @@ export function LiveScreen() {
   useEffect(() => {
     let active = true;
     const refresh = () =>
-      void SessionRuntime.getState().then((next) => active && setState(next));
+      void SessionRuntime.getState()
+        .then((next) => active && setState(next))
+        .catch(
+          () =>
+            active && setError('The timer could not be read. Trying again…'),
+        );
     refresh();
     const timer = setInterval(refresh, 500);
     const subscription = SessionRuntime.addListener('onStateChange', (next) => {
@@ -118,7 +136,7 @@ export function LiveScreen() {
       }}
     />
   );
-  if (error) {
+  if (error && (!state || !target)) {
     return (
       <Screen>
         {header}
@@ -155,7 +173,10 @@ export function LiveScreen() {
         {
           text: 'End session',
           style: 'destructive',
-          onPress: () => void SessionRuntime.end(),
+          onPress: () =>
+            void SessionRuntime.end().catch(() =>
+              setError('The session could not end. Please try again.'),
+            ),
         },
       ],
     );
@@ -164,6 +185,7 @@ export function LiveScreen() {
   return (
     <Screen>
       {header}
+      {error && <ErrorText>{error}</ErrorText>}
       <Text style={{ color: colors.secondary, fontSize: 16 }}>
         Stage {target.stage}, session {target.sessionIndex + 1}
         {target.isReplay ? ' (replay)' : ''}
@@ -212,7 +234,11 @@ export function LiveScreen() {
               fontWeight: '700',
             }}
           >
-            {state.pausedBy === 'call' ? 'Paused for a call' : 'Paused'}
+            {state.pausedBy === 'call'
+              ? 'Paused for a call'
+              : state.pausedBy === 'background'
+                ? 'Paused — keep this screen open'
+                : 'Paused'}
           </Text>
         )}
       </View>
@@ -253,9 +279,14 @@ export function LiveScreen() {
       <Button
         label={paused ? 'Resume' : 'Pause'}
         onPress={() =>
-          void (paused ? SessionRuntime.resume() : SessionRuntime.pause()).then(
-            setState,
-          )
+          void (paused ? SessionRuntime.resume() : SessionRuntime.pause())
+            .then((next) => {
+              setState(next);
+              setError(null);
+            })
+            .catch(() =>
+              setError('The timer could not change. Please try again.'),
+            )
         }
       />
       <Button label="End session" kind="danger" onPress={confirmEnd} />

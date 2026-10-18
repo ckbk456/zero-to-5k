@@ -27,6 +27,23 @@ export interface SessionRequest {
   isReplay: boolean;
 }
 
+// Starting and reconciling both cross the native/SQLite boundary. Serialize
+// them so a concurrent reconciliation cannot interrupt a newly inserted row
+// before native start has attached its session key.
+const pending = new WeakMap<Runtime, Promise<unknown>>();
+
+export function withRuntimeLock<T>(
+  runtime: Runtime,
+  task: () => Promise<T>,
+): Promise<T> {
+  const previous = pending.get(runtime) ?? Promise.resolve();
+  const operation = previous.catch(() => {}).then(task);
+  pending.set(runtime, operation);
+  return operation.finally(() => {
+    if (pending.get(runtime) === operation) pending.delete(runtime);
+  });
+}
+
 export async function startSession(
   db: SqlConnection,
   runtime: Runtime,
@@ -35,31 +52,39 @@ export async function startSession(
   settings: Pick<Settings, 'speech' | 'vibration'>,
   now: () => Date = () => new Date(),
 ): Promise<number> {
-  const session = getSession(plan, request.stage, request.sessionIndex);
-  const { segments, cues } = buildSchedule(session, plan.activity);
-  const attemptId = await startAttempt(db, {
-    planVersion: plan.version,
-    ...request,
-    startedAt: now().toISOString(),
+  return withRuntimeLock(runtime, async () => {
+    const state = await runtime.getState();
+    if (state.status === 'running' || state.status === 'paused') {
+      throw new Error('A session is already running.');
+    }
+    if (state.status !== 'idle') await settleUnlocked(db, runtime, now);
+
+    const session = getSession(plan, request.stage, request.sessionIndex);
+    const { segments, cues } = buildSchedule(session, plan.activity);
+    const attemptId = await startAttempt(db, {
+      planVersion: plan.version,
+      ...request,
+      startedAt: now().toISOString(),
+    });
+    try {
+      await runtime.start({
+        sessionKey: String(attemptId),
+        title: `Stage ${request.stage} · Session ${request.sessionIndex + 1}`,
+        segments,
+        cues,
+        speech: settings.speech,
+        vibration: settings.vibration,
+      });
+    } catch (error) {
+      await finishAttempt(db, attemptId, {
+        status: 'interrupted',
+        endedAt: now().toISOString(),
+        activeSeconds: null,
+      });
+      throw error;
+    }
+    return attemptId;
   });
-  try {
-    await runtime.start({
-      sessionKey: String(attemptId),
-      title: `Stage ${request.stage} · Session ${request.sessionIndex + 1}`,
-      segments,
-      cues,
-      speech: settings.speech,
-      vibration: settings.vibration,
-    });
-  } catch (error) {
-    await finishAttempt(db, attemptId, {
-      status: 'interrupted',
-      endedAt: now().toISOString(),
-      activeSeconds: null,
-    });
-    throw error;
-  }
-  return attemptId;
 }
 
 export type Settled =
@@ -75,14 +100,21 @@ export async function settle(
   runtime: Runtime,
   now: () => Date = () => new Date(),
 ): Promise<Settled> {
+  return withRuntimeLock(runtime, () => settleUnlocked(db, runtime, now));
+}
+
+async function settleUnlocked(
+  db: SqlConnection,
+  runtime: Runtime,
+  now: () => Date,
+): Promise<Settled> {
   const state = await runtime.getState();
   const key = state.sessionKey === null ? NaN : Number(state.sessionKey);
-  const attemptId = Number.isInteger(key) ? key : null;
+  const attemptId = Number.isSafeInteger(key) && key > 0 ? key : null;
 
-  if (
-    attemptId !== null &&
-    (state.status === 'running' || state.status === 'paused')
-  ) {
+  if (state.status === 'running' || state.status === 'paused') {
+    // An audio rehearsal has no database row and is owned by its own screen.
+    if (attemptId === null) return { kind: 'none' };
     await interruptStaleAttempts(db, attemptId);
     return { kind: 'live', attemptId };
   }
@@ -100,8 +132,15 @@ export async function settle(
         activeSeconds: Math.round(state.elapsedMs / 1000),
       });
       result = { kind: status, attemptId };
-    } catch {
-      // Already recorded by an earlier call.
+    } catch (error) {
+      const recorded = await db.getFirstAsync<{ status: string }>(
+        'SELECT status FROM session_attempts WHERE id = ?',
+        attemptId,
+      );
+      // A retry after native reset failed may find an already saved result.
+      // A storage failure must keep the terminal native state for retry.
+      if (recorded?.status !== status) throw error;
+      result = { kind: status, attemptId };
     }
   }
   if (state.status !== 'idle') await runtime.reset();
