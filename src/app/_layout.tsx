@@ -54,7 +54,8 @@ export default function RootLayout() {
           <Stack.Screen
             name="session/live"
             options={{
-              title: 'Running',
+              // The screen names the session's activity.
+              title: '',
               headerBackVisible: false,
               gestureEnabled: false,
             }}
@@ -73,6 +74,11 @@ export default function RootLayout() {
           />
           <Stack.Screen name="history" options={{ title: 'History' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+          <Stack.Screen
+            name="learn"
+            options={{ title: 'Race-walking basics' }}
+          />
+          <Stack.Screen name="cue-check" options={{ title: 'Try the cues' }} />
         </Stack>
         <StatusBar style="auto" />
       </SQLiteProvider>

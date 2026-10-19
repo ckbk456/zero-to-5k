@@ -1,28 +1,31 @@
 # Architecture and data contract
 
-One Expo SDK 57 / React Native application targets iOS and Android. Routes live in `src/app/`; screen bodies in `src/screens/`; supported activity values in `src/domain/activity.ts`. The UI uses the "blue track" palette in `src/theme/colors.ts` (light and dark, chosen by `useColors()` from the system scheme) and safe-area-aware scrolling.
+One Expo SDK 57 / React Native application targets iOS and Android. Routes live in `src/app/`; screen bodies in `src/screens/`; supported activity values, the ones the app offers (`OFFERED_ACTIVITIES`, race walking only since 2026-10-18), and the words that change with them ("Run" / "Race walk") in `src/domain/activity.ts`. The UI uses the "blue track" palette in `src/theme/colors.ts` (light and dark, chosen by `useColors()` from the system scheme) and safe-area-aware scrolling.
 
 ## SQLite
 
 `SQLiteProvider` opens `zero-to-5k.db` in the app sandbox and initializes migrations before rendering consumers. Migrations are append-only, each in its own transaction; failure rolls back that migration and its version.
 
-- Version 1: `app_preferences`, singleton `id = 1` with checked `activity` values `running` or `race-walking`. Fresh installs default to running.
+- Version 1: `app_preferences`, singleton `id = 1` with checked `activity` values `running` or `race-walking`. Fresh installs store running. `offeredActivity()` turns it into the program every screen shows: the stored value when it is offered, otherwise race walking. The home screen's activity switch writes it and appears only when more than one activity is offered.
 - Version 2: `session_attempts`, one row per started session: plan version, stage (1–9), session index (0–2), stage attempt, replay flag, start/end times, active seconds, status (`in_progress`, `completed`, `ended_early`, `interrupted`), and the post-session effort (0–10), pain, and decision (`continue`/`restart`). Schema checks allow answers only on completed rows. Repository functions end a row exactly once and record the check and decision exactly once; stale `in_progress` rows from a previous process become `interrupted`, never completed.
 
 - Version 3: `onboarded`, `speech`, and `vibration` preferences.
 - Version 4: `session_attempts.source`, `timed` (played by the runtime; existing rows) or `manual` (marked done without playing; completed, no time, never rated).
+- Version 5: `session_attempts` is rebuilt so `stage` only needs to be ≥ 1 (race walking has 16 stages; the plan owns the count). Every row, column, other check, and the `AUTOINCREMENT` counter is copied, so deleted ids are never reused.
+
+Rows belong to a program through `plan_version`. History, progress, and **Reset progress** (`resetProgress(db, planVersion)`) cover one program; the other keeps its rows.
 
 `PRAGMA user_version` tracks migrations. Existing data survives repeat initialization, and unknown newer versions are rejected without downgrading. WAL and foreign keys are enabled. Keep a single provider/migration owner and append future migrations instead of resetting data.
 
 ## Plan and progression
 
-`src/domain/plan.ts` bundles the approved running plan (`running-v1`): 9 stages × 3 sessions of intervals (`warmup`, `active`, `walk`, `cooldown`) in whole seconds. `src/domain/progression.ts` derives per-stage done sessions and states (`not_started`, `in_progress`, `completed`, `cleared`), the suggested next session, and the latest played session's pending check or decision from attempt history. Nothing is locked; a restart decision clears only its own stage, following the [MVP spec](../design/mvp-spec.md). Effort 9–10 or pain only recommends a restart; it never blocks.
+`src/domain/plan.ts` bundles the current plan per activity (`PLANS`) and immutable historical versions (`PLAN_CATALOG`), each 3 sessions per stage of intervals (`warmup`, `active`, `walk`, `cooldown`) in whole seconds: the approved running plan (`running-v1`, 9 stages, 30-minute goal) and the owner-selected race-walking plan (`race-walking-v2`, 12 stages, 40-minute goal; [preset](../design/race-walking-12-week-plan.md)). The 16-stage `race-walking-v1` remains unchanged and lookuppable. `active` is a run or a race walk depending on the plan's activity; recovery is always a walk. `useProgram(planVersion?)` loads the offered current plan or an explicitly requested historical version with isolated history; the live screen finds a session's plan from its attempt (`getAttempt`, `planByVersion`). `src/domain/progression.ts` derives per-stage done sessions and states (`not_started`, `in_progress`, `completed`, `cleared`), the suggested next session, and the latest played session's pending check or decision from attempt history. Nothing is locked; a restart decision clears only its own stage, following the [MVP spec](../design/mvp-spec.md). Effort 9–10 or pain only recommends a restart; it never blocks.
 
 The UI confirms a selection only after persistence succeeds, exposes failures, and allows retry. Initialization errors propagate to the Router error boundary. No cloud database, credentials, accounts, analytics, or location recording exists. SQLite is not application-level encrypted; review privacy and backup handling before sensitive records are added.
 
 ## Validation boundary
 
-`database.test.ts` executes the same SQL using Node SQLite through a narrow adapter. It covers fresh initialization, the version 1 → 2 upgrade, reopen persistence, future-version rejection, rollback, invalid values, and attempt write-once rules. `plan.test.ts` checks the bundled plan against the approved preset; `progression.test.ts` covers clearing, recommendations, restart, keep going, ignored rows, and the goal. This does not verify Expo's native bridge, device filesystem, or screen rendering; those remain in the manual guide.
+`database.test.ts` executes the same SQL using Node SQLite through a narrow adapter. It covers fresh initialization, the version 1 → 2 and 4 → 5 upgrades, reopen persistence, future-version rejection, rollback, invalid values, per-program reset, and attempt write-once rules. `plan.test.ts` checks both bundled plans against their presets; `progression.test.ts` covers clearing, recommendations, restart, keep going, ignored rows, and the goal. This does not verify Expo's native bridge, device filesystem, or screen rendering; those remain in the manual guide.
 
 ## Native session runtime
 
@@ -43,3 +46,11 @@ Native directories are generated by `npx expo prebuild` and ignored. Provisional
 ## Version authority
 
 The lockfile pins installed dependencies; `app.json` declares only iOS/Android. Web is not supported. SDK 57 was originally selected for physical-device Expo Go during the SDK 58 transition; the native runtime now requires development builds, following [Expo guidance](https://docs.expo.dev/get-started/create-a-project/) inspected 2026-10-16. Use version-specific docs and installed types.
+
+## 2026-10-19 delivery additions
+
+History offers each catalog version and total recorded unpaused session time; the legacy column `active_seconds` includes warm-ups/recovery and is not target-activity or vigorous time. Previews use `activeSeconds(session)` separately from `totalSeconds(session)`. New v2 content requires no schema change.
+
+The cue-check route runs a native 30-second schedule with a nonnumeric `cue-check` key, no database row, and cleanup restricted to that key. The guide is bundled offline text; only the explicit official-rules link opens a browser.
+
+Controller operations serialize start/settle per runtime. Finished results survive genuine database failures and are reset only after persistence is confirmed. iOS fallback pauses when backgrounded; Android speech failures have a bounded audio-focus release. See native implementation and manual guide for platform-specific validation boundaries.

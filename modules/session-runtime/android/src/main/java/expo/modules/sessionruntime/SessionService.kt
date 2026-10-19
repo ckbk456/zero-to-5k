@@ -22,12 +22,14 @@ class SessionService : Service() {
     super.onCreate()
     instance = this
     val manager = getSystemService(NotificationManager::class.java)
-    manager.createNotificationChannel(
-      NotificationChannel(CHANNEL_ID, "Workout session", NotificationManager.IMPORTANCE_LOW).apply {
-        description = "Shows the running session and its controls."
-        setShowBadge(false)
-      },
-    )
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      manager.createNotificationChannel(
+        NotificationChannel(CHANNEL_ID, "Workout session", NotificationManager.IMPORTANCE_LOW).apply {
+          description = "Shows the running session and its controls."
+          setShowBadge(false)
+        },
+      )
+    }
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -87,8 +89,11 @@ class SessionService : Service() {
       launch?.let {
         PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
       }
+    @Suppress("DEPRECATION")
     val builder =
-      Notification.Builder(this, CHANNEL_ID)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(this, CHANNEL_ID)
+      else Notification.Builder(this)
+    builder
         .setSmallIcon(android.R.drawable.ic_media_play)
         .setContentTitle(SessionEngine.title)
         .setContentText(if (paused) "Paused · $label" else label)

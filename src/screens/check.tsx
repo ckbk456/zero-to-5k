@@ -1,16 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSQLiteContext } from 'expo-sqlite';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
 import { EFFORT_LEVELS, effortLevel } from '@/domain/effort';
-import { RUNNING_PLAN } from '@/domain/plan';
 import {
   deriveProgress,
   recommend,
   type Recommendation,
 } from '@/domain/progression';
 import { useProgram } from '@/session/use-program';
-import { listAttempts, recordCheck, recordDecision } from '@/storage/database';
+import {
+  getAttempt,
+  listAttempts,
+  recordCheck,
+  recordDecision,
+  type AttemptHistoryItem,
+} from '@/storage/database';
 import { useColors } from '@/theme/colors';
 import {
   Body,
@@ -35,18 +41,57 @@ const ADVICE: Record<Exclude<Recommendation, 'none'>, [string, string]> = {
 };
 
 export function CheckScreen() {
-  const colors = useColors();
   const { attempt } = useLocalSearchParams<{ attempt: string }>();
-  const attemptId = Number(attempt);
-  const { db, data } = useProgram();
+  return <CheckIn key={attempt} attemptId={Number(attempt)} />;
+}
+
+function CheckIn({ attemptId }: { attemptId: number }) {
+  const colors = useColors();
+  const db = useSQLiteContext();
+  const [planVersion, setPlanVersion] = useState<string | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const { data, error: loadError } = useProgram(planVersion ?? undefined);
   const [effort, setEffort] = useState<number | null>(null);
   const [pain, setPain] = useState<boolean | null>(null);
-  const [advice, setAdvice] = useState<Recommendation | null>(null);
+  const [savedRow, setSavedRow] = useState<AttemptHistoryItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const saving = useRef(false);
 
-  if (!data) return <Loading label="Loading check-in" />;
-  const row = data.attempts.find((item) => item.id === attemptId);
+  useEffect(() => {
+    let active = true;
+    void getAttempt(db, attemptId)
+      .then((row) => {
+        if (!active) return;
+        if (row) setPlanVersion(row.planVersion);
+        else setLookupError('This session could not be found.');
+      })
+      .catch(
+        () =>
+          active &&
+          setLookupError(
+            'This session could not be loaded. Return to History and try again.',
+          ),
+      );
+    return () => {
+      active = false;
+    };
+  }, [db, attemptId]);
+
+  if (lookupError || loadError)
+    return (
+      <Screen>
+        <ErrorText>{lookupError ?? loadError}</ErrorText>
+        <Button label="Back to stages" onPress={() => router.dismissAll()} />
+      </Screen>
+    );
+  if (!data || !planVersion || data.plan.version !== planVersion)
+    return <Loading label="Loading check-in" />;
+  const { plan } = data;
+  const row =
+    savedRow?.id === attemptId
+      ? savedRow
+      : data.attempts.find((item) => item.id === attemptId);
   if (!row || row.status !== 'completed' || row.source !== 'timed') {
     return (
       <Screen>
@@ -60,24 +105,36 @@ export function CheckScreen() {
   // A rating already saved (for example before the app closed) skips straight
   // to the decision.
   const savedAdvice =
-    row.effort !== null && row.pain !== null && row.decision === null
+    row.effort !== null && row.pain !== null
       ? recommend(row.effort, row.pain)
       : null;
-  const shownAdvice = advice ?? (savedAdvice !== 'none' ? savedAdvice : null);
+  const shownAdvice = row.decision === null ? savedAdvice : null;
+
+  // Reads are repeated before writes because a prior Save may have succeeded
+  // even if the subsequent read or navigation failed. Never replace saved answers.
+  async function readSavedAttempt() {
+    const latest = (await listAttempts(db, plan.version)).find(
+      (item) => item.id === attemptId,
+    );
+    if (!latest || latest.status !== 'completed' || latest.source !== 'timed') {
+      throw new Error('This session cannot be checked in.');
+    }
+    setSavedRow(latest);
+    return latest;
+  }
 
   // Shows the stage result only when this session finished the stage.
   async function finish() {
-    const attempts = await listAttempts(db, RUNNING_PLAN.version);
+    const attempts = await listAttempts(db, plan.version);
     const before = deriveProgress(
-      RUNNING_PLAN,
+      plan,
       attempts.filter((item) => item.id !== attemptId),
     ).stages[stageIndex]?.state;
-    const after = deriveProgress(RUNNING_PLAN, attempts).stages[stageIndex]
-      ?.state;
+    const after = deriveProgress(plan, attempts).stages[stageIndex]?.state;
     if ((after === 'cleared' || after === 'completed') && before !== after) {
       router.replace({
         pathname: '/stage-result',
-        params: { stage: String(row!.stage) },
+        params: { stage: String(row!.stage), plan: plan.version },
       });
     } else {
       router.dismissAll();
@@ -85,34 +142,97 @@ export function CheckScreen() {
   }
 
   async function submit() {
-    if (effort === null || pain === null) return;
+    if (effort === null || pain === null || saving.current) return;
+    saving.current = true;
     setBusy(true);
     setError(null);
     try {
-      if (row!.effort === null) await recordCheck(db, attemptId, effort, pain);
-      const next = recommend(effort, pain);
-      if (next === 'none') await finish();
-      else {
-        setAdvice(next);
-        setBusy(false);
+      let latest = await readSavedAttempt();
+      if (latest.effort === null) {
+        await recordCheck(db, attemptId, effort, pain);
+        latest = await readSavedAttempt();
+      }
+      if (latest.effort === null || latest.pain === null) {
+        throw new Error('Your answers were not saved.');
+      }
+      if (latest.decision === 'restart') router.dismissAll();
+      else if (
+        recommend(latest.effort, latest.pain) === 'none' ||
+        latest.decision === 'continue'
+      ) {
+        await finish();
       }
     } catch {
-      setError('Your answers could not be saved. Please try again.');
+      setError(
+        'Your check-in could not finish. Please try again; any saved answers are kept.',
+      );
+    } finally {
+      saving.current = false;
       setBusy(false);
     }
   }
 
   async function decide(decision: 'continue' | 'restart') {
+    if (saving.current) return;
+    saving.current = true;
     setBusy(true);
     setError(null);
     try {
-      await recordDecision(db, attemptId, decision);
-      if (decision === 'restart') router.dismissAll();
+      let latest = await readSavedAttempt();
+      if (latest.decision === null) {
+        await recordDecision(db, attemptId, decision);
+        latest = await readSavedAttempt();
+      }
+      if (latest.decision === 'restart') router.dismissAll();
       else await finish();
     } catch {
-      setError('Your choice could not be saved. Please try again.');
+      setError(
+        'Your choice could not finish. Please try again; any saved choice is kept.',
+      );
+    } finally {
+      saving.current = false;
       setBusy(false);
     }
+  }
+
+  async function continueSaved() {
+    if (saving.current) return;
+    saving.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const latest = await readSavedAttempt();
+      if (latest.decision === 'restart') router.dismissAll();
+      else await finish();
+    } catch {
+      setError(
+        'Your check-in is saved, but the next screen could not load. Please try again.',
+      );
+    } finally {
+      saving.current = false;
+      setBusy(false);
+    }
+  }
+
+  if (
+    savedAdvice !== null &&
+    (savedAdvice === 'none' || row.decision !== null)
+  ) {
+    return (
+      <Screen>
+        <Title>Check-in saved</Title>
+        <Body>
+          Your effort rating and pain answer are already recorded. You do not
+          need to enter them again.
+        </Body>
+        {error && <ErrorText>{error}</ErrorText>}
+        <Button
+          label="Continue"
+          disabled={busy}
+          onPress={() => void continueSaved()}
+        />
+      </Screen>
+    );
   }
 
   if (shownAdvice && shownAdvice !== 'none') {

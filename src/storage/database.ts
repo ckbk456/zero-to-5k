@@ -26,7 +26,7 @@ export interface Database extends SqlConnection {
   ): Promise<void>;
 }
 
-export const DATABASE_VERSION = 4;
+export const DATABASE_VERSION = 5;
 
 export async function migrateDatabase(db: Database): Promise<void> {
   const version = await db.getFirstAsync<{ user_version: number }>(
@@ -40,7 +40,13 @@ export async function migrateDatabase(db: Database): Promise<void> {
   if (version.user_version === DATABASE_VERSION) return;
 
   // Append new migrations; never edit a released one.
-  const migrations = [migration1, migration2, migration3, migration4];
+  const migrations = [
+    migration1,
+    migration2,
+    migration3,
+    migration4,
+    migration5,
+  ];
   for (const [index, migrate] of migrations.entries()) {
     if (version.user_version > index) continue;
     await db.withExclusiveTransactionAsync(async (transaction) => {
@@ -128,6 +134,50 @@ async function migration4(db: SqlConnection): Promise<void> {
   `);
 }
 
+// Version 5: race walking has 16 stages, so the stage count is left to the
+// plan. SQLite cannot change a CHECK in place, so the table is rebuilt with
+// every row and its id counter kept.
+async function migration5(db: SqlConnection): Promise<void> {
+  await db.execAsync(`
+    CREATE TABLE session_attempts_v5 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plan_version TEXT NOT NULL,
+      stage INTEGER NOT NULL CHECK (stage >= 1),
+      session_index INTEGER NOT NULL CHECK (session_index BETWEEN 0 AND 2),
+      stage_attempt INTEGER NOT NULL CHECK (stage_attempt >= 1),
+      is_replay INTEGER NOT NULL CHECK (is_replay IN (0, 1)),
+      started_at TEXT NOT NULL,
+      ended_at TEXT,
+      active_seconds INTEGER CHECK (active_seconds >= 0),
+      status TEXT NOT NULL CHECK (
+        status IN ('in_progress', 'completed', 'ended_early', 'interrupted')
+      ),
+      effort INTEGER CHECK (effort BETWEEN 0 AND 10),
+      pain INTEGER CHECK (pain IN (0, 1)),
+      decision TEXT CHECK (decision IN ('continue', 'restart')),
+      source TEXT NOT NULL DEFAULT 'timed' CHECK (source IN ('timed', 'manual')),
+      CHECK (status = 'completed' OR (effort IS NULL AND pain IS NULL)),
+      CHECK ((effort IS NULL) = (pain IS NULL)),
+      CHECK (decision IS NULL OR effort IS NOT NULL)
+    );
+    INSERT INTO session_attempts_v5 (
+      id, plan_version, stage, session_index, stage_attempt, is_replay,
+      started_at, ended_at, active_seconds, status, effort, pain, decision,
+      source
+    )
+    SELECT id, plan_version, stage, session_index, stage_attempt, is_replay,
+           started_at, ended_at, active_seconds, status, effort, pain,
+           decision, source
+    FROM session_attempts;
+    DELETE FROM sqlite_sequence WHERE name = 'session_attempts_v5';
+    INSERT INTO sqlite_sequence (name, seq)
+      SELECT 'session_attempts_v5', seq FROM sqlite_sequence
+      WHERE name = 'session_attempts';
+    DROP TABLE session_attempts;
+    ALTER TABLE session_attempts_v5 RENAME TO session_attempts;
+  `);
+}
+
 export interface Settings {
   onboarded: boolean;
   speech: boolean;
@@ -208,6 +258,37 @@ export async function listAttempts(
     endedAt: row.ended_at,
     activeSeconds: row.active_seconds,
   }));
+}
+
+// One attempt with the plan it belongs to, for screens that start from an
+// attempt id rather than the selected activity.
+export async function getAttempt(
+  db: SqlConnection,
+  id: number,
+): Promise<
+  | (Pick<AttemptRecord, 'stage' | 'sessionIndex' | 'isReplay'> & {
+      planVersion: string;
+    })
+  | null
+> {
+  const row = await db.getFirstAsync<{
+    plan_version: string;
+    stage: number;
+    session_index: number;
+    is_replay: number;
+  }>(
+    `SELECT plan_version, stage, session_index, is_replay
+     FROM session_attempts WHERE id = ?`,
+    id,
+  );
+  return row
+    ? {
+        planVersion: row.plan_version,
+        stage: row.stage,
+        sessionIndex: row.session_index,
+        isReplay: row.is_replay === 1,
+      }
+    : null;
 }
 
 export async function startAttempt(
@@ -335,6 +416,13 @@ export async function recordDecision(
   if (result.changes !== 1) throw new Error('This decision was already made.');
 }
 
-export async function resetProgress(db: SqlConnection): Promise<void> {
-  await db.runAsync('DELETE FROM session_attempts');
+// Deletes one program's history; other programs keep theirs.
+export async function resetProgress(
+  db: SqlConnection,
+  planVersion: string,
+): Promise<void> {
+  await db.runAsync(
+    'DELETE FROM session_attempts WHERE plan_version = ?',
+    planVersion,
+  );
 }

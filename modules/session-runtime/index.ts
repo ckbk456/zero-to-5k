@@ -11,7 +11,7 @@ export interface RuntimeState {
   sessionKey: string | null;
   elapsedMs: number;
   totalMs: number;
-  pausedBy: 'user' | 'call' | null;
+  pausedBy: 'user' | 'call' | 'background' | null;
   // False on iOS when no workout session could start: the screen must stay on.
   backgroundCapable: boolean;
 }

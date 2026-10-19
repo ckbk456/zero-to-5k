@@ -1,5 +1,6 @@
 // Cue schedule for a session: a chime plus one spoken word per change. Contract: docs/design/mvp-spec.md §4.
 
+import { ACTIVITY_COPY, type Activity } from './activity';
 import { totalSeconds, type IntervalKind, type Session } from './plan';
 
 export interface ScheduledCue {
@@ -12,12 +13,15 @@ export interface ScheduledSegment {
   durationMs: number;
 }
 
-export const INTERVAL_LABELS: Record<IntervalKind, string> = {
+const WALK_LABELS: Record<Exclude<IntervalKind, 'active'>, string> = {
   warmup: 'Warm-up walk',
-  active: 'Run',
   walk: 'Walk',
   cooldown: 'Cool-down walk',
 };
+
+export function intervalLabel(kind: IntervalKind, activity: Activity): string {
+  return kind === 'active' ? ACTIVITY_COPY[activity].active : WALK_LABELS[kind];
+}
 
 export function describeDuration(seconds: number): string {
   if (seconds < 60 || seconds === 90) return `${seconds} seconds`;
@@ -28,15 +32,16 @@ export function describeDuration(seconds: number): string {
   return minutes === 1 ? '1 minute' : `${minutes} minutes`;
 }
 
-// Spoken after the chime: one word per change.
-const CUE_WORDS: Record<IntervalKind, string> = {
-  warmup: 'Walk',
-  active: 'Run',
-  walk: 'Walk',
-  cooldown: 'Walk',
-};
+// Spoken after the chime: the activity's name for active intervals, "Walk"
+// for the rest.
+function cueWord(kind: IntervalKind, activity: Activity): string {
+  return kind === 'active' ? ACTIVITY_COPY[activity].active : 'Walk';
+}
 
-export function buildSchedule(session: Session): {
+export function buildSchedule(
+  session: Session,
+  activity: Activity,
+): {
   segments: ScheduledSegment[];
   cues: ScheduledCue[];
 } {
@@ -46,10 +51,13 @@ export function buildSchedule(session: Session): {
 
   for (const interval of session.intervals) {
     segments.push({
-      label: INTERVAL_LABELS[interval.kind],
+      label: intervalLabel(interval.kind, activity),
       durationMs: interval.seconds * 1000,
     });
-    cues.push({ atMs: startSeconds * 1000, text: CUE_WORDS[interval.kind] });
+    cues.push({
+      atMs: startSeconds * 1000,
+      text: cueWord(interval.kind, activity),
+    });
     startSeconds += interval.seconds;
   }
 

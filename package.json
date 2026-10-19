@@ -1,7 +1,7 @@
 {
   "name": "zero-to-5k",
   "main": "expo-router/entry",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "dependencies": {
     "expo": "~57.0.30",
     "expo-constants": "~57.0.22",
@@ -44,7 +44,7 @@
     "doctor": "expo-doctor"
   },
   "private": true,
-  "description": "Time-based running and race-walking coaching for iOS and Android.",
+  "description": "Offline race-walking coaching for iOS and Android.",
   "license": "UNLICENSED",
   "engines": {
     "node": ">=24.17.0 <25",

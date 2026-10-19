@@ -8,8 +8,16 @@ import { test } from 'node:test';
 
 import type { Activity } from '../domain/activity';
 import {
+  RACE_WALKING_PLAN,
+  RACE_WALKING_PLAN_V1,
+  getSession,
+  planByVersion,
+} from '../domain/plan';
+import { deriveProgress } from '../domain/progression';
+import {
   DATABASE_VERSION,
   finishAttempt,
+  getAttempt,
   getPreferredActivity,
   interruptStaleAttempts,
   listAttempts,
@@ -265,18 +273,173 @@ test('stale sessions become interrupted, never completed', async () => {
   }
 });
 
-test('schema rejects invalid attempts; reset clears history', async () => {
+test('schema rejects invalid attempts; reset clears one program', async () => {
   const { db, sqlite } = connect();
   try {
     await migrateDatabase(db);
-    await assert.rejects(startAttempt(db, { ...attempt, stage: 10 }));
+    await assert.rejects(startAttempt(db, { ...attempt, stage: 0 }));
     await assert.rejects(startAttempt(db, { ...attempt, sessionIndex: 3 }));
     await startAttempt(db, attempt);
-    await startAttempt(db, { ...attempt, planVersion: 'other' });
+    const walked = await startAttempt(db, {
+      ...attempt,
+      planVersion: 'race-walking-v1',
+      stage: 16,
+    });
     assert.equal((await listAttempts(db, 'running-v1')).length, 1);
-    await resetProgress(db);
+    assert.deepEqual(await getAttempt(db, walked), {
+      planVersion: 'race-walking-v1',
+      stage: 16,
+      sessionIndex: 0,
+      isReplay: false,
+    });
+    assert.equal(await getAttempt(db, walked + 1), null);
+    await resetProgress(db, 'running-v1');
     assert.deepEqual(await listAttempts(db, 'running-v1'), []);
-    assert.deepEqual(await listAttempts(db, 'other'), []);
+    assert.equal((await listAttempts(db, 'race-walking-v1')).length, 1);
+  } finally {
+    sqlite.close();
+  }
+});
+
+test('new curriculum keeps legacy attempts intact and starts independent progress', async () => {
+  const { db, sqlite } = connect();
+  try {
+    await migrateDatabase(db);
+    const legacyCompleted = await startAttempt(db, {
+      ...attempt,
+      planVersion: 'race-walking-v1',
+      stage: 16,
+    });
+    await finishAttempt(db, legacyCompleted, {
+      status: 'completed',
+      endedAt: '2026-10-18T09:00:00.000Z',
+      activeSeconds: 3000,
+    });
+    await recordCheck(db, legacyCompleted, 6, false);
+    const legacyLive = await startAttempt(db, {
+      ...attempt,
+      planVersion: 'race-walking-v1',
+      stage: 16,
+      sessionIndex: 1,
+    });
+    await markSessionDone(db, {
+      planVersion: 'race-walking-v1',
+      stage: 1,
+      sessionIndex: 2,
+      stageAttempt: 1,
+      markedAt: '2026-10-18T08:00:00.000Z',
+    });
+    await startAttempt(db, attempt);
+    const rowsBefore = sqlite
+      .prepare('SELECT * FROM session_attempts ORDER BY id')
+      .all();
+
+    // A catalog change does not require or trigger a data migration.
+    await migrateDatabase(db);
+    assert.deepEqual(
+      sqlite.prepare('SELECT * FROM session_attempts ORDER BY id').all(),
+      rowsBefore,
+    );
+    const legacyHistory = await listAttempts(db, 'race-walking-v1');
+    assert.equal(
+      deriveProgress(RACE_WALKING_PLAN_V1, legacyHistory).stages[15]?.done[0],
+      true,
+    );
+    const currentHistory = await listAttempts(db, RACE_WALKING_PLAN.version);
+    assert.deepEqual(currentHistory, []);
+    assert.deepEqual(deriveProgress(RACE_WALKING_PLAN, currentHistory).next, {
+      stage: 1,
+      sessionIndex: 0,
+      stageAttempt: 1,
+    });
+
+    // An attempt saved by the previous binary still resolves its exact intervals.
+    const liveAttempt = await getAttempt(db, legacyLive);
+    assert.ok(liveAttempt);
+    const livePlan = planByVersion(liveAttempt.planVersion);
+    assert.equal(livePlan, RACE_WALKING_PLAN_V1);
+    assert.equal(
+      getSession(livePlan!, liveAttempt.stage, liveAttempt.sessionIndex)
+        .intervals[1]?.seconds,
+      2400,
+    );
+
+    await markSessionDone(db, {
+      planVersion: RACE_WALKING_PLAN.version,
+      stage: 1,
+      sessionIndex: 0,
+      stageAttempt: 1,
+      markedAt: '2026-10-19T08:00:00.000Z',
+    });
+    assert.equal((await listAttempts(db, RACE_WALKING_PLAN.version)).length, 1);
+    assert.deepEqual(await listAttempts(db, 'race-walking-v1'), legacyHistory);
+    await resetProgress(db, RACE_WALKING_PLAN.version);
+    assert.deepEqual(
+      sqlite.prepare('SELECT * FROM session_attempts ORDER BY id').all(),
+      rowsBefore,
+    );
+  } finally {
+    sqlite.close();
+  }
+});
+
+// Runs the real migrations up to `version`, then stops.
+async function migrateTo(db: Database, version: number): Promise<void> {
+  let applied = 0;
+  const partial: Database = {
+    ...db,
+    withExclusiveTransactionAsync: (task) =>
+      applied++ < version
+        ? db.withExclusiveTransactionAsync(task)
+        : Promise.reject(new Error('stopped')),
+  };
+  await assert.rejects(migrateDatabase(partial), /stopped/);
+}
+
+test('version 4 databases lift the stage limit, keeping every row and id', async () => {
+  const { db, sqlite } = connect();
+  try {
+    await migrateTo(db, 4);
+    await assert.rejects(startAttempt(db, { ...attempt, stage: 10 }));
+    const kept = await startAttempt(db, attempt);
+    await finishAttempt(db, kept, {
+      status: 'completed',
+      endedAt: '2026-10-16T08:30:00.000Z',
+      activeSeconds: 1710,
+    });
+    await recordCheck(db, kept, 4, false);
+    const removed = await startAttempt(db, attempt);
+    sqlite.exec(`DELETE FROM session_attempts WHERE id = ${removed}`);
+
+    await migrateDatabase(db);
+    assert.equal(
+      (await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))
+        ?.user_version,
+      DATABASE_VERSION,
+    );
+    const [row] = await listAttempts(db, 'running-v1');
+    assert.equal(row?.id, kept);
+    assert.equal(row?.status, 'completed');
+    assert.equal(row?.source, 'timed');
+    assert.equal(row?.effort, 4);
+    assert.equal(row?.activeSeconds, 1710);
+
+    // Deleted ids are never reused.
+    const next = await startAttempt(db, {
+      ...attempt,
+      planVersion: 'race-walking-v1',
+      stage: 16,
+    });
+    assert.ok(next > removed);
+    for (const change of [
+      'stage = 0',
+      'session_index = 3',
+      "source = 'guess'",
+      "status = 'done'",
+    ]) {
+      assert.throws(() => sqlite.exec(`UPDATE session_attempts SET ${change}`));
+    }
+    await assert.rejects(recordCheck(db, next, 3, false), /already rated/);
   } finally {
     sqlite.close();
   }

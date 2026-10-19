@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { RUNNING_PLAN } from './plan';
+import { RACE_WALKING_PLAN, RACE_WALKING_PLAN_V1, RUNNING_PLAN } from './plan';
 import {
   deriveProgress,
   recommend,
@@ -202,3 +202,41 @@ test('finishing stage 9 reaches the goal, even with earlier gaps', () => {
   assert.equal(progress.pending, null);
   assert.ok(progress.stages.every((stage) => stage.state === 'cleared'));
 });
+
+for (const [plan, stageCount] of [
+  [RACE_WALKING_PLAN, 12],
+  [RACE_WALKING_PLAN_V1, 16],
+] as const) {
+  test(`${plan.version} clears across its ${stageCount} stages`, () => {
+    const fresh = deriveProgress(plan, []);
+    assert.equal(fresh.stages.length, stageCount);
+    assert.deepEqual(fresh.next, {
+      stage: 1,
+      sessionIndex: 0,
+      stageAttempt: 1,
+    });
+
+    const history = Array.from({ length: stageCount - 1 }, (_, index) =>
+      easyStage(index + 1),
+    ).flat();
+    const almost = deriveProgress(plan, history);
+    assert.equal(almost.goalReached, false);
+    assert.deepEqual(almost.next, {
+      stage: stageCount,
+      sessionIndex: 0,
+      stageAttempt: 1,
+    });
+
+    const progress = deriveProgress(plan, [
+      ...history,
+      ...easyStage(stageCount),
+    ]);
+    assert.equal(progress.goalReached, true);
+    assert.ok(progress.stages.every((stage) => stage.state === 'cleared'));
+    // The running plan has only 9 stages; these later rows clear no running goal.
+    assert.equal(
+      deriveProgress(RUNNING_PLAN, easyStage(stageCount)).goalReached,
+      false,
+    );
+  });
+}

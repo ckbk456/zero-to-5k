@@ -1,17 +1,20 @@
-# App and data — pending
+# App and data
 
-Use a physical iPhone (iOS 26+) and Android phone with a release or development build (Expo Go is not supported).
+Record device/build/date/steps/actual result for every performed check. Emulator evidence is separate from physical device acceptance. Never clear existing user data to simplify a test.
 
-1. Fresh install shows the welcome and safety screen once; "Let's go" opens the stage map at stage 1, session 1.
-2. Stage map: a labelled "Stages" stepper of 9 numbered circles on one line with a done count (done stages filled with the line between them filled, stages in progress outlined in blue, the picked stage ringed and larger), the picked stage panel with tip and 3 sessions, History and Settings links. Tapping a session row expands it in place (one at a time; the next undone session starts expanded) to show its interval bar and a condensed step list where repeated run/walk pairs read as one line with a count (stage 1: warm-up, "Run 1 min, walk 1½ min × 7", run, cool-down); the panel button previews the expanded session. Any stage and session can be opened.
-3. Preview shows the minute-labelled bar, total, and interval list. A stage ahead of the suggestion shows a caution. Mark as done asks for confirmation, records the session without a rating, and shows it as done; History shows "Marked done". Start Start asks for Apple Health workout permission (iOS) or notification permission (Android, 13+) the first time only.
-4. Complete a session (use a short test only in a disposable build, never by editing a user's database). The check-in requires effort 0–10 and a pain answer before saving.
-5. Effort ≤ 8 and no pain returns to the stage map. Effort 9–10 or pain shows the recommendation; **Restart stage** clears that stage's done sessions (attempt 2); **Keep going** keeps the session done, and the finished stage shows "Completed", not "Cleared".
-6. The session that finishes a stage shows the stage result (cleared or completed); running a done session again does not, unless it turns the stage from completed to cleared. After stage 9 the goal screen appears.
-7. Close the app during a check-in; relaunch shows "How did your last session go?".
-8. History lists every attempt with status, time, effort, pain, and decision. Settings toggles persist; Reset progress requires typing RESET and returns to stage 1.
-9. Upgrade an install from the previous build without clearing data; preferences and history survive.
-10. Blue theme in light and dark mode (text and interval labels readable on the blue stage panel), large text, small screens, VoiceOver/TalkBack labels, touch targets.
-11. Works offline; no location or account prompts.
+1. Fresh install: compact welcome describes twelve stages and 40 minutes, with conditional 5K pace reference and iOS screen-off support. Start is visible at normal phone/text size; large text scrolls without clipping. Optional Learn opens the basics and returns without completing onboarding. Complete onboarding once; relaunch bypasses it.
+2. Home: twelve stage stops in two rows of six. All can be selected; suggested stage opens by default. Each has three expandable sessions, race-walking minutes and overall duration. Stage1 is 8 × 1 minute with 90-second breaks (28:30 overall); stage12 session1 is 51:30 overall, session3 is 50:00 overall with 40 continuous minutes.
+3. Preview: Start is above the full interval list. Choosing ahead within stage5 or later warns about order. Mark as done confirms, persists, contributes to progress, and records no measured time. No reward infers distance or continuous ability from manual completion.
+4. Native session: Start, pause, resume, end with confirmation; early endings appear in History and do not complete a session. Full sessions lead to an effort0–10/pain check-in.
+5. Check-in: effort≤8/no pain continues;9–10 or pain offers rest/repeat. Retry preserves already-saved answers after persistence/navigation failure. Reopening a fully rated session offers Continue, not a new rating. Restart resets that stage's progress, not history.
+6. Stage results: completed and cleared wording remains truthful for manual entries, pain reports and recorded ratings. Invalid result routes show an in-progress message.
+7. History: switch among current12-stage, earlier16-stage and running records; counts/times belong to each exact version. Old completions never credit new doses. An old timed session can finish its own check-in and result route.
+8. Upgrade over previous build: migration5 preserves rows, preferences and id sequence. The12-stage content needs no further schema change.
+9. Settings: sound/vibration persist; long labels fit. Typed RESET deletes current-v2 history only; previous versions remain. Avoid exercising deletion against existing user records—use a disposable QA simulator for destructive reset checks.
+10. Cue rehearsal: Settings/preview/guide launch30 seconds, words Walk/Race walk/Walk/Done. No training row is written. Leaving or immediately starting a workout never lets rehearsal cleanup reset it. Sound-off/vibration settings are respected.
+11. Guide: text available offline; official-rules link is explicit. No claim that the timer judges legal gait or protects knees.
+12. Small screens, large text, light/dark, VoiceOver/TalkBack focus, comfortable touch targets, offline use, and error/retry paths. Loading failures should show a retry/error rather than an endless spinner.
 
-No device QA has been performed yet.
+## Evidence
+
+To be filled with dated delivery evidence after native builds and app interaction. Host tests alone do not mark these passed.

@@ -1,13 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Stack } from 'expo-router/stack';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Alert, AppState, BackHandler, Text, View } from 'react-native';
 
-import { INTERVAL_LABELS } from '@/domain/cues';
-import { RUNNING_PLAN, getSession, type Interval } from '@/domain/plan';
+import { ACTIVITY_COPY } from '@/domain/activity';
+import { intervalLabel } from '@/domain/cues';
+import {
+  getSession,
+  planByVersion,
+  type Interval,
+  type Plan,
+} from '@/domain/plan';
 import { SessionRuntime, type RuntimeState } from '@modules/session-runtime';
 import { settle } from '@/session/controller';
-import { listAttempts } from '@/storage/database';
+import { getAttempt } from '@/storage/database';
 import { useColors } from '@/theme/colors';
 import {
   Body,
@@ -39,6 +46,7 @@ export function LiveScreen() {
   const db = useSQLiteContext();
   const [state, setState] = useState<RuntimeState | null>(null);
   const [target, setTarget] = useState<{
+    plan: Plan;
     stage: number;
     sessionIndex: number;
     isReplay: boolean;
@@ -46,12 +54,26 @@ export function LiveScreen() {
   const [error, setError] = useState<string | null>(null);
   const leaving = useRef(false);
 
+  // The attempt names its own plan, whichever activity is selected.
   useEffect(() => {
-    void listAttempts(db, RUNNING_PLAN.version).then((rows) => {
-      const row = rows.find((item) => item.id === attemptId);
-      if (row) setTarget(row);
-      else setError('This session could not be found.');
-    });
+    let active = true;
+    void getAttempt(db, attemptId)
+      .then((row) => {
+        if (!active) return;
+        const plan = row && planByVersion(row.planVersion);
+        if (row && plan) setTarget({ ...row, plan });
+        else setError('This session could not be found.');
+      })
+      .catch(
+        () =>
+          active &&
+          setError(
+            'This session could not be loaded. Return to stages to recover it.',
+          ),
+      );
+    return () => {
+      active = false;
+    };
   }, [db, attemptId]);
 
   // The runtime is the source of truth; poll it while visible and listen for
@@ -59,7 +81,12 @@ export function LiveScreen() {
   useEffect(() => {
     let active = true;
     const refresh = () =>
-      void SessionRuntime.getState().then((next) => active && setState(next));
+      void SessionRuntime.getState()
+        .then((next) => active && setState(next))
+        .catch(
+          () =>
+            active && setError('The timer could not be read. Trying again…'),
+        );
     refresh();
     const timer = setInterval(refresh, 500);
     const subscription = SessionRuntime.addListener('onStateChange', (next) => {
@@ -102,23 +129,40 @@ export function LiveScreen() {
       });
   }, [state, target, db, attemptId]);
 
-  if (error) {
+  const header = (
+    <Stack.Screen
+      options={{
+        title: target ? ACTIVITY_COPY[target.plan.activity].name : '',
+      }}
+    />
+  );
+  if (error && (!state || !target)) {
     return (
       <Screen>
+        {header}
         <ErrorText>{error}</ErrorText>
         <Button label="Back to stages" onPress={() => router.dismissAll()} />
       </Screen>
     );
   }
-  if (!state || !target) return <Loading label="Loading session" />;
+  if (!state || !target) {
+    return (
+      <>
+        {header}
+        <Loading label="Loading session" />
+      </>
+    );
+  }
 
-  const session = getSession(RUNNING_PLAN, target.stage, target.sessionIndex);
+  const { activity } = target.plan;
+  const session = getSession(target.plan, target.stage, target.sessionIndex);
   const elapsed = state.elapsedMs / 1000;
   const total = state.totalMs / 1000;
   const { index, interval, remaining } = locate(session.intervals, elapsed);
   const next = session.intervals[index + 1];
   const paused = state.status === 'paused';
-  const running = interval.kind === 'active';
+  const active = interval.kind === 'active';
+  const label = intervalLabel(interval.kind, activity);
 
   function confirmEnd() {
     Alert.alert(
@@ -129,7 +173,10 @@ export function LiveScreen() {
         {
           text: 'End session',
           style: 'destructive',
-          onPress: () => void SessionRuntime.end(),
+          onPress: () =>
+            void SessionRuntime.end().catch(() =>
+              setError('The session could not end. Please try again.'),
+            ),
         },
       ],
     );
@@ -137,6 +184,8 @@ export function LiveScreen() {
 
   return (
     <Screen>
+      {header}
+      {error && <ErrorText>{error}</ErrorText>}
       <Text style={{ color: colors.secondary, fontSize: 16 }}>
         Stage {target.stage}, session {target.sessionIndex + 1}
         {target.isReplay ? ' (replay)' : ''}
@@ -145,30 +194,30 @@ export function LiveScreen() {
       <View
         accessible
         accessibilityLiveRegion="polite"
-        accessibilityLabel={`${INTERVAL_LABELS[interval.kind]}, ${formatClock(remaining)} left`}
+        accessibilityLabel={`${label}, ${formatClock(remaining)} left`}
         style={{
           alignItems: 'center',
           paddingVertical: 32,
           gap: 2,
           borderRadius: 28,
           borderCurve: 'continuous',
-          backgroundColor: running ? colors.lane : colors.card,
-          borderWidth: running ? 0 : 1,
+          backgroundColor: active ? colors.lane : colors.card,
+          borderWidth: active ? 0 : 1,
           borderColor: colors.line,
         }}
       >
         <Text
           style={{
-            color: running ? colors.onLane : colors.text,
+            color: active ? colors.onLane : colors.text,
             fontSize: 40,
             fontWeight: '800',
           }}
         >
-          {INTERVAL_LABELS[interval.kind]}
+          {label}
         </Text>
         <Text
           style={{
-            color: running ? colors.onLane : colors.text,
+            color: active ? colors.onLane : colors.text,
             fontSize: 88,
             lineHeight: 96,
             fontWeight: '200',
@@ -180,12 +229,16 @@ export function LiveScreen() {
         {paused && (
           <Text
             style={{
-              color: running ? colors.onLane : colors.warning,
+              color: active ? colors.onLane : colors.warning,
               fontSize: 20,
               fontWeight: '700',
             }}
           >
-            {state.pausedBy === 'call' ? 'Paused for a call' : 'Paused'}
+            {state.pausedBy === 'call'
+              ? 'Paused for a call'
+              : state.pausedBy === 'background'
+                ? 'Paused — keep this screen open'
+                : 'Paused'}
           </Text>
         )}
       </View>
@@ -193,6 +246,7 @@ export function LiveScreen() {
       <Card>
         <IntervalBar
           intervals={session.intervals}
+          activity={activity}
           progress={total > 0 ? elapsed / total : 0}
         />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -201,7 +255,8 @@ export function LiveScreen() {
         </View>
         {next && (
           <Body muted>
-            Next: {INTERVAL_LABELS[next.kind]} for {formatClock(next.seconds)}
+            Next: {intervalLabel(next.kind, activity)} for{' '}
+            {formatClock(next.seconds)}
           </Body>
         )}
       </Card>
@@ -214,9 +269,9 @@ export function LiveScreen() {
             Keep the screen on
           </Text>
           <Body>
-            Cues stop if the phone locks. To run with the screen off, allow
-            Build to 30 to save workouts in the Health app (Sharing → Apps), on
-            iOS 26 or later.
+            Cues stop if the phone locks. To {ACTIVITY_COPY[activity].verb} with
+            the screen off, allow Zero to 5K to save workouts in the Health app
+            (Sharing → Apps), on iOS 26 or later.
           </Body>
         </Card>
       )}
@@ -224,9 +279,14 @@ export function LiveScreen() {
       <Button
         label={paused ? 'Resume' : 'Pause'}
         onPress={() =>
-          void (paused ? SessionRuntime.resume() : SessionRuntime.pause()).then(
-            setState,
-          )
+          void (paused ? SessionRuntime.resume() : SessionRuntime.pause())
+            .then((next) => {
+              setState(next);
+              setError(null);
+            })
+            .catch(() =>
+              setError('The timer could not change. Please try again.'),
+            )
         }
       />
       <Button label="End session" kind="danger" onPress={confirmEnd} />

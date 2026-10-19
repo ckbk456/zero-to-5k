@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import { router } from 'expo-router';
+import Constants from 'expo-constants';
 import { Switch, Text, TextInput, View } from 'react-native';
 
+import { ACTIVITY_COPY, OFFERED_ACTIVITIES } from '@/domain/activity';
 import { useProgram } from '@/session/use-program';
 import {
   resetProgress,
@@ -15,6 +18,7 @@ import {
   ErrorText,
   Heading,
   Loading,
+  Row,
   Screen,
 } from '@/ui/kit';
 
@@ -22,11 +26,21 @@ const CONFIRM_WORD = 'RESET';
 
 export function SettingsScreen() {
   const colors = useColors();
-  const { db, data, reload } = useProgram();
+  const { db, data, reload, error: loadError } = useProgram();
   const [confirm, setConfirm] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  if (loadError)
+    return (
+      <Screen>
+        <ErrorText>{loadError}</ErrorText>
+        <Button label="Try again" onPress={() => void reload()} />
+      </Screen>
+    );
   if (!data) return <Loading label="Loading settings" />;
+  const { plan } = data;
+  const copy = ACTIVITY_COPY[plan.activity];
+  const program = copy.name.toLowerCase();
 
   async function toggle(key: 'speech' | 'vibration', value: boolean) {
     setError(null);
@@ -41,7 +55,7 @@ export function SettingsScreen() {
   async function reset() {
     setError(null);
     try {
-      await resetProgress(db);
+      await resetProgress(db, plan.version);
       setConfirm('');
       setMessage('Progress reset. You are back at stage 1.');
       await reload();
@@ -56,7 +70,10 @@ export function SettingsScreen() {
         <Heading>Cues</Heading>
         {(
           [
-            ['speech', 'Sound (chime + "run" / "walk")'],
+            [
+              'speech',
+              `Sound (chime + "${copy.active.toLowerCase()}" / "walk")`,
+            ],
             ['vibration', 'Vibration'],
           ] as const
         ).map(([key, label]) => (
@@ -69,7 +86,16 @@ export function SettingsScreen() {
               minHeight: 44,
             }}
           >
-            <Text style={{ color: colors.text, fontSize: 17 }}>{label}</Text>
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: 17,
+                flex: 1,
+                paddingRight: 12,
+              }}
+            >
+              {label}
+            </Text>
             <Switch
               accessibilityLabel={label}
               value={data.settings[key]}
@@ -78,13 +104,21 @@ export function SettingsScreen() {
           </View>
         ))}
         <Body muted>Changes apply from your next session.</Body>
+        <Row
+          label="Try the cues · 30 seconds"
+          onPress={() => router.push('/cue-check')}
+          last
+        />
       </Card>
 
       <Card>
-        <Heading>Reset progress</Heading>
+        <Heading>Reset {program} progress</Heading>
         <Body muted>
-          Deletes all session history and returns you to stage 1. Type{' '}
-          {CONFIRM_WORD} to confirm.
+          Deletes this 12-stage plan’s history and returns you to stage 1. Older
+          plan history is kept.
+          {OFFERED_ACTIVITIES.length > 1 &&
+            ' The other program keeps its progress.'}{' '}
+          Type {CONFIRM_WORD} to confirm.
         </Body>
         <TextInput
           accessibilityLabel={`Type ${CONFIRM_WORD} to confirm`}
@@ -104,7 +138,7 @@ export function SettingsScreen() {
           }}
         />
         <Button
-          label="Reset progress"
+          label={`Reset ${program} progress`}
           kind="danger"
           disabled={confirm.trim() !== CONFIRM_WORD}
           onPress={() => void reset()}
@@ -117,16 +151,28 @@ export function SettingsScreen() {
       <Card>
         <Heading>About and safety</Heading>
         <Body>
-          Build to 30 takes generally healthy adults from walking to 30 minutes
-          of continuous running in 9 stages, based on the widely used NHS Couch
-          to 5K structure. It is not medical advice or a rehabilitation program.
+          Zero to 5K takes generally healthy adults from walking to a 5K race
+          walk in 12 stages: 40 minutes of continuous race walking, about 5 km
+          at 8 minutes per km. The app counts time, not distance or speed; at a
+          slower pace, 5 km takes a little longer. It is not medical advice or a
+          rehabilitation program.
+        </Body>
+        <Body>
+          The program is a draft written for this app and has not been reviewed
+          by a coach yet. The app times your practice; it cannot judge whether
+          your technique meets race-walking rules.
         </Body>
         <Body>
           Stop and rest if you feel chest pain, faintness, or severe
           breathlessness, and check with a doctor if you have a health concern.
-          Your data stays on this phone.
+          Your session history is stored on this device. There is no account,
+          advertising, location tracking or cloud sync. System backups may
+          include app data.
         </Body>
       </Card>
+      <Body muted>
+        Version {Constants.expoConfig?.version ?? '0.1.0'} · Offline first
+      </Body>
     </Screen>
   );
 }

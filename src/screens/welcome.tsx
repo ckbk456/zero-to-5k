@@ -3,15 +3,7 @@ import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import { updateSettings } from '@/storage/database';
-import {
-  Body,
-  Button,
-  Card,
-  ErrorText,
-  Heading,
-  Screen,
-  Title,
-} from '@/ui/kit';
+import { Body, Button, Card, ErrorText, Screen, Title } from '@/ui/kit';
 
 export function WelcomeScreen() {
   const db = useSQLiteContext();
@@ -32,33 +24,33 @@ export function WelcomeScreen() {
 
   return (
     <Screen>
-      <Title>From zero to 30 minutes</Title>
+      <Title>Build your race walk</Title>
       <Body>
-        Build to 30 is a game of 9 stages. Each stage has 3 run/walk sessions.
-        Put your phone in your pocket, play your own music or podcast, and the
-        app tells you when to run and when to walk — even with the screen off.
-      </Body>
-      <Body>
-        After each session you rate how hard it felt. If it was near your limit
-        or something hurt, we will suggest repeating the stage. It is always
-        your call.
+        12 stages to 40 continuous minutes — 5 km at 8:00/km. Your time counts
+        at any pace.
       </Body>
 
       <Card>
-        <Heading>Before you start</Heading>
+        <Body>3 sessions a week, with a rest day between.</Body>
         <Body>
-          This program is for generally healthy adults. If you have a heart
-          condition, chest pain, dizziness, or a health concern, check with a
-          doctor first.
+          Cues over your music or podcasts. On iOS, screen-off cues need
+          supported workout access.
         </Body>
-        <Body>
-          Stop and rest if you feel chest pain, faintness, or severe
-          breathlessness. Go slow enough to talk — speed does not matter.
-        </Body>
+        <Body>Repeat any session. There is no deadline.</Body>
       </Card>
 
+      <Body muted>
+        For generally healthy adults. Stop for pain, chest discomfort, faintness
+        or unusual breathlessness. Seek help for severe or persistent symptoms.
+      </Body>
       {error && <ErrorText>{error}</ErrorText>}
-      <Button label="Let's go" onPress={() => void begin()} disabled={busy} />
+      <Button label="Start" onPress={() => void begin()} disabled={busy} />
+      <Button
+        label="Learn the basics (optional)"
+        kind="secondary"
+        onPress={() => router.push('/learn')}
+        disabled={busy}
+      />
     </Screen>
   );
 }

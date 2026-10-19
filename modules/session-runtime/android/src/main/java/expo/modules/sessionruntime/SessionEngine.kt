@@ -50,9 +50,16 @@ object SessionEngine {
   private var appContext: Context? = null
   private var tts: TextToSpeech? = null
   private var ttsReady = false
+  private var ttsFailed = false
   private var pendingSpeech: String? = null
   private var chime: MediaPlayer? = null
   private var focusRequest: AudioFocusRequest? = null
+  private var legacyFocusListener: AudioManager.OnAudioFocusChangeListener? = null
+  private var focusHeld = false
+  private var cueGeneration = 0L
+  private var activeUtterance: String? = null
+  // A broken/missing TTS engine must never leave the user's music ducked.
+  private val focusTimeout = Runnable { silence() }
 
   private val ticker =
     object : Runnable {
@@ -73,7 +80,7 @@ object SessionEngine {
     speech: Boolean,
     vibration: Boolean,
   ) {
-    check(status != "running" && status != "paused") { "A session is already running." }
+    check(status == "idle") { "Finish saving the current session before starting another." }
     appContext = context.applicationContext
     this.sessionKey = sessionKey
     this.title = title
@@ -90,11 +97,17 @@ object SessionEngine {
     lastSegment = -1
     finalElapsed = null
     status = "running"
-    ensureSpeech()
-    ContextCompat.startForegroundService(
-      context,
-      Intent(context, SessionService::class.java).setAction(SessionService.ACTION_SHOW),
-    )
+    try {
+      ContextCompat.startForegroundService(
+        context,
+        Intent(context, SessionService::class.java).setAction(SessionService.ACTION_SHOW),
+      )
+    } catch (error: Exception) {
+      status = "idle"
+      this.sessionKey = null
+      throw error
+    }
+    if (speech) ensureSpeech()
     handler.removeCallbacks(ticker)
     ticker.run()
     emit()
@@ -194,36 +207,50 @@ object SessionEngine {
   private fun teardown(keepSpeech: Boolean) {
     handler.removeCallbacks(ticker)
     if (!keepSpeech) silence()
+    // Keep the service alive until the final cue finishes (or its bounded
+    // timeout), so background execution cannot end halfway through "Done".
+    if (!keepSpeech || !focusHeld) stopService()
+  }
+
+  private fun stopService() {
     appContext?.let { it.stopService(Intent(it, SessionService::class.java)) }
   }
 
   // Cues
 
   private fun ensureSpeech() {
-    if (tts != null) return
+    if (tts != null && !ttsFailed) return
+    tts?.shutdown()
+    tts = null
+    ttsReady = false
+    ttsFailed = false
     val context = appContext ?: return
     tts =
       TextToSpeech(context) { result ->
         handler.post {
-          ttsReady = result == TextToSpeech.SUCCESS
+          // All current cue text is English, independently of device locale.
+          val language = if (result == TextToSpeech.SUCCESS) tts?.setLanguage(Locale.US) else null
+          ttsReady = language != null && language >= TextToSpeech.LANG_AVAILABLE
+          ttsFailed = !ttsReady
           if (ttsReady) {
-            tts?.language = Locale.getDefault()
             tts?.setAudioAttributes(attributes)
             tts?.setOnUtteranceProgressListener(
               object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {}
 
                 override fun onDone(utteranceId: String?) {
-                  handler.post { releaseFocus() }
+                  handler.post { finishUtterance(utteranceId) }
                 }
 
                 @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) {
-                  handler.post { releaseFocus() }
+                  handler.post { finishUtterance(utteranceId) }
                 }
               },
             )
             pendingSpeech?.let { speakWord(it) }
+          } else if (chime == null) {
+            releaseFocus()
           }
           pendingSpeech = null
         }
@@ -243,22 +270,50 @@ object SessionEngine {
     silence()
     val context = appContext ?: return
     val audio = context.getSystemService(AudioManager::class.java) ?: return
-    val request =
-      AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-        .setAudioAttributes(attributes)
-        .build()
-    focusRequest = request
-    audio.requestAudioFocus(request)
+    val generation = cueGeneration
+    val listener = AudioManager.OnAudioFocusChangeListener { change ->
+      if (generation == cueGeneration &&
+        (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+      ) {
+        silence()
+      }
+    }
+    val focusResult =
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val request =
+          AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+            .setAudioAttributes(attributes)
+            .setOnAudioFocusChangeListener(listener, handler)
+            .build()
+        focusRequest = request
+        audio.requestAudioFocus(request)
+      } else {
+        legacyFocusListener = listener
+        @Suppress("DEPRECATION")
+        val result = audio.requestAudioFocus(
+          listener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
+        )
+        result
+      }
+    if (focusResult != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+      releaseFocus()
+      return
+    }
+    focusHeld = true
+    handler.postDelayed(focusTimeout, 6_000)
+    var createdPlayer: MediaPlayer? = null
     val player =
       try {
         context.resources.openRawResourceFd(R.raw.chime).use { file ->
           MediaPlayer().apply {
+            createdPlayer = this
             setAudioAttributes(attributes)
             setDataSource(file.fileDescriptor, file.startOffset, file.length)
             prepare()
           }
         }
       } catch (error: Exception) {
+        createdPlayer?.release()
         null
       }
     if (player == null) {
@@ -269,20 +324,48 @@ object SessionEngine {
     player.setOnCompletionListener {
       it.release()
       if (chime === it) chime = null
+      if (generation == cueGeneration) speakWord(text)
+    }
+    player.setOnErrorListener { failed, _, _ ->
+      if (chime === failed) chime = null
+      failed.release()
+      if (generation == cueGeneration) speakWord(text)
+      true
+    }
+    try {
+      player.start()
+    } catch (error: Exception) {
+      if (chime === player) chime = null
+      player.release()
       speakWord(text)
     }
-    player.start()
   }
 
   private fun speakWord(text: String) {
     if (ttsReady) {
-      tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "cue-${SystemClock.elapsedRealtime()}")
-    } else {
+      val utterance = "cue-$cueGeneration"
+      activeUtterance = utterance
+      if (tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utterance) != TextToSpeech.SUCCESS) {
+        activeUtterance = null
+        releaseFocus()
+      }
+    } else if (!ttsFailed) {
       pendingSpeech = text
+    } else {
+      releaseFocus()
     }
   }
 
+  private fun finishUtterance(utteranceId: String?) {
+    // A stopped older utterance may deliver its callback after a new cue starts.
+    if (utteranceId == null || utteranceId != activeUtterance) return
+    activeUtterance = null
+    releaseFocus()
+  }
+
   private fun silence() {
+    cueGeneration += 1
+    activeUtterance = null
     chime?.release()
     chime = null
     pendingSpeech = null
@@ -291,9 +374,18 @@ object SessionEngine {
   }
 
   private fun releaseFocus() {
-    val request = focusRequest ?: return
-    appContext?.getSystemService(AudioManager::class.java)?.abandonAudioFocusRequest(request)
+    handler.removeCallbacks(focusTimeout)
+    val audio = appContext?.getSystemService(AudioManager::class.java)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      focusRequest?.let { audio?.abandonAudioFocusRequest(it) }
+    } else {
+      @Suppress("DEPRECATION")
+      legacyFocusListener?.let { audio?.abandonAudioFocus(it) }
+    }
     focusRequest = null
+    legacyFocusListener = null
+    focusHeld = false
+    if (status == "finished" || status == "ended" || status == "idle") stopService()
   }
 
   private fun vibrate() {
@@ -305,7 +397,12 @@ object SessionEngine {
         @Suppress("DEPRECATION")
         context.getSystemService(Vibrator::class.java)
       }
-    vibrator?.vibrate(VibrationEffect.createOneShot(400, VibrationEffect.DEFAULT_AMPLITUDE))
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      vibrator?.vibrate(VibrationEffect.createOneShot(400, VibrationEffect.DEFAULT_AMPLITUDE))
+    } else {
+      @Suppress("DEPRECATION")
+      vibrator?.vibrate(400L)
+    }
   }
 
   // State
